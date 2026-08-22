@@ -1,0 +1,47 @@
+{
+  "id": "io.neodon.gui",
+  "command": "neodon-vpn.py",
+  "runtime": "org.kde.Platform",
+  "runtime-version": "6.11",
+  "sdk": "org.kde.Sdk",
+  "base": "io.qt.PySide.BaseApp",
+  "base-version": "6.11",
+  "build-options": {
+    "env": [
+      "BASEAPP_REMOVE_WEBENGINE=1",
+      "BASEAPP_DISABLE_NUMPY=1"
+    ]
+  },
+  "finish-args": [
+    "--share=network",
+    "--socket=wayland",
+    "--socket=fallback-x11",
+    "--device=dri",
+    "--filesystem=~/AI:ro",
+    "--system-talk-name=org.freedesktop.systemd1",
+    "--talk-name=org.freedesktop.Flatpak"
+  ],
+  "cleanup-commands": [
+    "/app/cleanup-BaseApp.sh"
+  ],
+  "modules": [
+    {
+      "name": "neodon-vpn",
+      "buildsystem": "simple",
+      "build-commands": [
+        "install -Dm755 neodon-vpn.py /app/bin/neodon-vpn.py",
+        "install -Dm644 gui-state.json /app/share/neodon/gui-state.json",
+        "install -Dm644 gui-action.json /app/share/neodon/gui-action.json",
+        "install -Dm644 io.neodon.gui.desktop /app/share/applications/io.neodon.gui.desktop",
+        "install -Dm644 io.neodon.gui.svg /app/share/icons/hicolor/scalable/apps/io.neodon.gui.svg",
+        "mkdir -p /app/bin/flags && cp -r flags/*.png /app/bin/flags/ 2>/dev/null || true"
+      ],
+      "sources": [
+        {
+          "type": "dir",
+          "path": "app"
+        }
+      ]
+    }
+  ]
+}

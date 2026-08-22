@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# neodon-hostctl: fixed host-control API bridge for the Neodon Flatpak GUI.
+# Whitelist-only operations. No eval, no arbitrary argument passthrough.
+# Ops: status | start <proxy|smart|full> | stop | retry | server <id>
+set -euo pipefail
+
+TOGGLE="$HOME/AI/singbox-toggle.sh"
+SERVER="$HOME/AI/singbox-server.sh"
+MODE_FILE="$HOME/AI/singbox/.mode"
+
+case "${1:-}" in
+  status)
+    exec bash "$TOGGLE" status-json
+    ;;
+  start)
+    mode="${2:-}"
+    case "$mode" in
+      proxy|smart|full) exec bash "$TOGGLE" "$mode" ;;
+      *) echo "neodon-hostctl: invalid mode '$mode' (expected proxy|smart|full)" >&2; exit 2 ;;
+    esac
+    ;;
+  stop)
+    exec bash "$TOGGLE" off
+    ;;
+  retry)
+    mode="$(cat "$MODE_FILE")"
+    if [ "$mode" = "off" ]; then
+      printf '%s\n' '{"ok":true,"action":"retry","mode":"off","result":"idle"}'
+      exit 0
+    fi
+    exec bash "$TOGGLE" "$mode"
+    ;;
+  server)
+    id="${2:-}"
+    if ! [[ "$id" =~ ^[0-9]+$ ]]; then
+      echo "neodon-hostctl: invalid server id '$id' (expected integer)" >&2
+      exit 2
+    fi
+    exec bash "$SERVER" set "$id"
+    ;;
+  profile)
+    case "$2" in
+      default|ai|anti-censorship|ru-bez-vpn|russia-mimo|ru-traffic-direct|popular-ai|social-networks|only-unavailable|socseti-vpn|basic-set) exec python3 ~/AI/singbox/apply-profile.py "$2" ;;
+      *) echo "neodon-hostctl: invalid profile '$2' (expected default|ai|anti-censorship)" >&2; exit 2 ;;
+    esac
+    ;;
+  *)
+    echo "Usage: neodon-hostctl {status|start <proxy|smart|full>|stop|retry|server <id>}" >&2
+    exit 2
+    ;;
+esac

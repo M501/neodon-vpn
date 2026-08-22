@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Neodon VPN
+Comment=Neodon VPN client
+Exec=neodon-vpn.py
+Type=Application
+Categories=Network;
+Icon=io.neodon.gui
+Terminal=false

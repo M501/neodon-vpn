@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.bak
+*.bak-*
+*.json.bak*
+raw.json
+sub.txt
+sing-box
+geoip.db
+geosite.db
+*.srs
+.watchdog-state.json
+.mode
+.selected-server.json
