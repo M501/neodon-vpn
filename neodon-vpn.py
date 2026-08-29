@@ -17,6 +17,7 @@ import time
 
 from PySide6.QtCore import Qt, QThread, QTimer, QSize, Signal, QEasingCurve
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QPushButton,
+                               QSystemTrayIcon, QMenu,
                                QVBoxLayout, QHBoxLayout, QStackedWidget, QFrame,
                                QListWidget, QListWidgetItem, QMessageBox,
                                QComboBox, QProgressBar, QRadioButton, QButtonGroup,
@@ -89,6 +90,8 @@ PRESETS = [
      True, ["domain:avito.st", "geosite:category-ru", "geosite:private", "regexp:.*\\.ru$", "regexp:.*\\.xn--p1ai$"], [], []),
     ("ru-traffic-direct", ".ru трафик напрямую", "📄", "Пропускает русский трафик напрямую, минуя прокси", False,
      True, ["domain:avito.st", "domain:vk.com", "geosite:category-ru", "regexp:.*\\.ru$", "regexp:.*\\.su$"], [], []),
+    ("traffic-rus", "Трафик Рус", "🇷🇺", "Эконом: только заблокированное через VPN, остальное мимо — не жрет квоту", True,
+     False, ["domain:avito.st", "domain:vk.com", "geosite:category-ru", "geosite:private", "regexp:.*\.ru$", "regexp:.*\.su$", "regexp:.*\.xn--p1ai$"], ["geosite:youtube", "geosite:google", "geosite:discord", "geosite:openai", "geosite:anthropic", "geosite:google-gemini", "geosite:instagram", "geosite:spotify", "geosite:tiktok", "geosite:telegram", "geosite:whatsapp", "geosite:cloudflare", "geosite:meta", "geosite:twitter", "geosite:twitch", "geosite:linkedin", "geosite:microsoft", "geosite:notion"], []),
     ("popular-ai", "Popular AI", "🤖", "Популярные нейросети через VPN, остальной трафик мимо VPN", True,
      False, [], ["geosite:category-ai-!cn", "geosite:category-ai-cn"], []),
     ("social-networks", "Social Networks", "💬", "Популярные соцсети через VPN, остальной трафик напрямую", True,
@@ -588,6 +591,7 @@ class MainWindow(QMainWindow):
         self.active_addr = None
         ensure_rules()
         self._build_ui()
+        self._setup_tray()
         self.set_mode(current_mode() if current_mode() in ("smart", "full") else "smart")
         self.refresh_active_server()
         self.reload_servers()
@@ -598,7 +602,7 @@ class MainWindow(QMainWindow):
         self.poll_timer.timeout.connect(self.poll_status)
         self.poll_timer.start(4000)
         self.render_presets()
-        self.fetch_sub_info()
+        self.refresh_sub()  # auto-refresh on every GUI start
         self.fetch_exit_ip()
         self.poll_status()
 
@@ -1382,8 +1386,82 @@ class MainWindow(QMainWindow):
         self.reload_servers()
         self.statusBar().showMessage("Подписка обновлена", 6000)
 
+    def _setup_tray(self):
+        try:
+            from PySide6.QtWidgets import QSystemTrayIcon, QMenu
+            from PySide6.QtGui import QAction, QIcon
+        except Exception:
+            return
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+        self.tray = QSystemTrayIcon(self)
+        # use same shield svg as icon, fallback to standard
+        try:
+            icon = QIcon("/home/m26/.local/share/icons/hicolor/scalable/apps/io.neodon.gui.svg")
+            if icon.isNull():
+                icon = self.windowIcon() or QIcon.fromTheme("network-vpn")
+        except Exception:
+            icon = self.windowIcon()
+        self.tray.setIcon(icon if not icon.isNull() else QIcon.fromTheme("network-vpn"))
+        self.tray.setToolTip("Neodon VPN")
+        menu = QMenu()
+        act_show = menu.addAction("Показать")
+        act_show.triggered.connect(self._tray_show)
+        menu.addSeparator()
+        act_proxy = menu.addAction("PROXY")
+        act_proxy.triggered.connect(lambda: self.set_mode("smart", restart=True))
+        act_tunnel = menu.addAction("TUNNEL")
+        act_tunnel.triggered.connect(lambda: self.set_mode("full", restart=True))
+        menu.addSeparator()
+        act_quit = menu.addAction("Выход")
+        act_quit.triggered.connect(self._tray_quit)
+        self.tray.setContextMenu(menu)
+        self.tray.activated.connect(self._tray_activated)
+        self.tray.show()
+        self._tray_first_hide = True
+
+    def _tray_show(self):
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _tray_activated(self, reason):
+        from PySide6.QtWidgets import QSystemTrayIcon
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            self._tray_show()
+
+    def _tray_quit(self):
+        self._really_quit = True
+        self.close()
+
     def closeEvent(self, event):
-        # limit wait so window actually closes promptly
+        # minimize to tray instead of quit — like steam/qbit near clock
+        if getattr(self, "_really_quit", False):
+            for w in list(self._workers):
+                w.wait(1500)
+            try:
+                super().closeEvent(event)
+            except Exception:
+                event.accept()
+            try:
+                if hasattr(self, "tray"):
+                    self.tray.hide()
+            except Exception:
+                pass
+            from PySide6.QtWidgets import QApplication as _QA
+            _QA.quit()
+            return
+        if hasattr(self, "tray") and self.tray.isVisible():
+            event.ignore()
+            self.hide()
+            if getattr(self, "_tray_first_hide", False):
+                self._tray_first_hide = False
+                try:
+                    self.tray.showMessage("Neodon VPN", "Скрыт в трей возле часов — клик по иконке чтобы вернуть", QSystemTrayIcon.MessageIcon.Information, 3000)
+                except Exception:
+                    pass
+            return
+        # fallback: no tray available — quit as before
         for w in list(self._workers):
             w.wait(1500)
         try:

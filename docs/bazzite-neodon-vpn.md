@@ -333,6 +333,25 @@ ip link show tun0 && sudo -n firewall-cmd --direct --get-all-rules | wc -l
 - Окно `500×700→720×700` `min 620×680` — на 1280×720 всё в 2 ряда без вложенного скролла, драгаешь整个 страницу.
 - `render_servers` `COLS=2` `r=i//2 c=i%2`, `select_server` без `currentItem`.
 
+## Auto-подписка (2026-08-29 19:36)
+
+- `__init__ fetch_sub_info -> refresh_sub fetch_body=True` — при каждом запуске тянет `raw.json` 10 серверов + `subscription-userinfo` 52.8/150 + подписка.
+
+## Flags FI/IS (2026-08-29 19:34)
+
+- `FI.png 117B` `IS.png 144B` PIL 32×22, `flag_code [RU2]->RU`, `QPixmap.isNull False`, SD 9 flags.
+
+## Tray (2026-08-29 22:22)
+
+- `QSystemTrayIcon` `io.neodon.gui.svg` рядом со `steam/qBittorrent/Sync` (`StatusNotifierWatcher` :1.132 :1.138), `closeEvent hide + tray.showMessage`, меню `Показать/PROXY/TUNNEL/Выход`, `isSystemTrayAvailable true`.
+- `io.neodon.gui.desktop` один в `~/.local/share/applications/` + `~/Desktop/Neodon 0,2`.
+
+## Eco Traffic-Rus (2026-08-29 22:19)
+
+- `traffic-rus` теперь эконом: `global False final direct` + `direct RU` + `proxy только заблокированное (youtube/google/discord/openai...)` → Handy `huggingface.co` мимо квоты, YouTube через VPN.
+- `process_name` только `qbittorrent/steam` (wine убран).
+- `apply-profile traffic-rus` → `sing-box check OK`.
+
 ## Траблшутинг
 
 | Симптом | Что делать |

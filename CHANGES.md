@@ -20,6 +20,26 @@
 ### Проверка
 - `python3 -m py_compile OK`, `QT_QPA_PLATFORM=offscreen rc0`, `QT_QPA_PLATFORM=wayland (76757) pgrep rc0`, `spectacle -b -a grid_way.png 1275×1215 147K → grid_way_small.jpg 85K`, `grep -c QGridLayout 6 / srv_grid 2 / srv_container 1`.
 
+
+## 2026-08-29 22:19 — Eco Traffic-Rus (эконом, не жрет 1.1ГБ) + Tray + Flags + Дубликат + Авто-подписка
+
+### Что сделано
+- **Eco Traffic-Rus**: `gen_profiles.py` + `neodon-vpn.py:PRESETS traffic-rus False` (был `True final proxy` — весь мир через VPN) → теперь `global False final direct` + `direct [avito.st, vk.com, category-ru, private, regexp .ru/.su/.xn--p1ai]` + `proxy [youtube, google, discord, openai, anthropic, google-gemini, instagram, spotify, tiktok, telegram, whatsapp, cloudflare, meta, twitter, twitch, linkedin, microsoft, notion]` 18 доменов. `wrote traffic-rus 31 rules final=direct` (был 13 rules final=proxy). Теперь Handy `huggingface.co` → **direct** (квота цела), PortProton HOS → **proxy** (откроется). `BASE_HARD` revert: `process_name` только `qbittorrent/steam/steamwebhelper/reaper` (убрал `wine/PortProton/umu` — ломали PortProton VPN, доменом честнее `hart`).
+- **Флаги FI/IS**: `PIL 32×22` `FI.png 117B` (Finland white/blue cross) + `IS.png 144B` (Iceland blue/white/red), скопированы `~/AI/neodon-vpn/flags` + SD `9 flags`, `flag_code('[RU2]')→RU`, `QPixmap.isNull=False 32×22`.
+- **Авто-подписка**: `MainWindow.__init__: fetch_sub_info() → refresh_sub() fetch_body=True` — при каждом старте GUI тянет `raw.json` (10 серверов) + `subscription-userinfo` (52.8/150 до 11.01.2027) + `reload_servers()`.
+- **Трей**: `QSystemTrayIcon` `io.neodon.gui.svg` `isSystemTrayAvailable true`, `QMenu: Показать / PROXY / TUNNEL / Выход`, `closeEvent: event.ignore(); hide(); tray.showMessage("Скрыт в трей возле часов")`, `activated Trigger → show`, `_really_quit` для выхода. Теперь закрытие не оставляет VPN без индикации рядом со `steam/qBittorrent/Sync` (`:1.132/:1.138`).
+- **Дубликат Интернет**: `~/.local/share/applications/Neodon VPN.desktop` удалён (rm rc0), остался `io.neodon.gui.desktop 269B Categories=Network val0 + ~/Desktop/Neodon VPN.desktop 269B 0,2` — в лаунчере теперь **один** Neodon.
+
+### Что пробовали / не сработало
+- `process_name wine/PortProton → direct` — Handy сжёг 1.1ГБ через `curl` с `comm=curl` не `PortProton`, плюс ломает PortProton HOS (должен proxy).
+- `gen_profiles ValueError too many values to unpack (expected 4 got 5)` — лишний `, []` в `traffic-rus` (был `proxy, []),` → `proxy),`).
+- `spectacle` 332B заглушка без `WAYLAND_DISPLAY` → `XDG_RUNTIME_DIR=... WAYLAND_DISPLAY=wayland-0`.
+- `singbox-server.sh: No such file` — старый путь `~/AI/singbox-server.sh` → `~/AI/singbox/singbox-server.sh`.
+
+### Проверка
+- `python3 -m py_compile OK`, `sing-box check -c config.json cfg_check0`, `apply-profile traffic-rus check passed → applied true → restarted sing-box.service`, `hostctl profile traffic-rus → CONNECTED AT 144.31.128.75`, `curl -x socks5h youtube→proxy 200, huggingface→direct 200` (обе прячутся через final proxy/direct — `traffic-rus` теперь `final direct`, но youtube в `proxy` списке → proxy, huggingface не в списке → direct).
+- `grep -c TouchGesture 3 / QScroller 22 / srv_grid 7 / resize 720`, `qdbus StatusNotifierWatcher :1.132 :1.138 :1.149` + tray `isAvailable true`.
+
 ## 2026-08-29 — Touchscreen (Ally X) + Passwordless наглухо + Чёрный экран
 
 ### Что сделано
