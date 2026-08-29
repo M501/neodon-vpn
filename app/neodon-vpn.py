@@ -555,6 +555,7 @@ def _enable_kinetic(scroll_area):
         from PySide6.QtWidgets import QScroller, QScrollerProperties
         vp = scroll_area.viewport()
         QScroller.grabGesture(vp, QScroller.ScrollerGestureType.LeftMouseButtonGesture)
+        QScroller.grabGesture(vp, QScroller.ScrollerGestureType.TouchGesture)
         sp = QScroller.scroller(vp)
         props = sp.scrollerProperties()
         props.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.1)
@@ -682,6 +683,7 @@ class MainWindow(QMainWindow):
                 from PySide6.QtWidgets import QScrollerProperties
                 sp = QScroller.scroller(body.viewport())
                 QScroller.grabGesture(body.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture)
+                QScroller.grabGesture(body.viewport(), QScroller.ScrollerGestureType.TouchGesture)
                 props = sp.scrollerProperties()
                 # make it feel like native touch (faster, no overshoot)
                 props.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.08)
@@ -1020,6 +1022,7 @@ class MainWindow(QMainWindow):
             from PySide6.QtWidgets import QScrollerProperties
             sp2 = QScroller.scroller(self.apps_scroll.viewport())
             QScroller.grabGesture(self.apps_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture)
+            QScroller.grabGesture(self.apps_scroll.viewport(), QScroller.ScrollerGestureType.TouchGesture)
             props2 = sp2.scrollerProperties()
             props2.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.08)
             props2.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.008)
