@@ -15,7 +15,7 @@ import subprocess
 import sys
 import time
 
-from PySide6.QtCore import Qt, QThread, QTimer, QSize, Signal
+from PySide6.QtCore import Qt, QThread, QTimer, QSize, Signal, QEasingCurve
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QPushButton,
                                QVBoxLayout, QHBoxLayout, QStackedWidget, QFrame,
                                QListWidget, QListWidgetItem, QMessageBox,
@@ -36,8 +36,8 @@ RULES_JSON = os.path.join(APP_DIR, "app-rules.json")
 HELPER = os.path.join(APP_DIR, "apply-app-rules.py")
 CONVERTER = os.path.join(BASE, "neodon-sub", "neodon-sub.py")
 RAW = os.path.join(BASE, "neodon-sub", "raw.json")
-TOGGLE = os.path.join(BASE, "singbox-toggle.sh")
-SERVER_SCRIPT = os.path.join(BASE, "singbox-server.sh")
+TOGGLE = os.path.join(BASE, "singbox", "singbox-toggle.sh")
+SERVER_SCRIPT = os.path.join(BASE, "singbox", "singbox-server.sh")
 SANDBOX = bool(os.environ.get("FLATPAK_ID"))
 STATE_DIR = os.path.expanduser("~/.var/app/io.neodon.gui") if SANDBOX else APP_DIR
 ACTION_HOOK = os.path.join(STATE_DIR, "gui-action.json")
@@ -548,6 +548,23 @@ class _ClickFrame(QFrame):
         super().mouseReleaseEvent(e)
 
 
+
+def _enable_kinetic(scroll_area):
+    """Enable drag-to-scroll anywhere inside QScrollArea viewport."""
+    try:
+        from PySide6.QtWidgets import QScroller, QScrollerProperties
+        vp = scroll_area.viewport()
+        QScroller.grabGesture(vp, QScroller.ScrollerGestureType.LeftMouseButtonGesture)
+        sp = QScroller.scroller(vp)
+        props = sp.scrollerProperties()
+        props.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.1)
+        props.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.01)
+        props.setScrollMetric(QScrollerProperties.ScrollMetric.DragVelocitySmoothingFactor, 0.25)
+        props.setScrollMetric(QScrollerProperties.ScrollMetric.DecelerationFactor, 0.12)
+        sp.setScrollerProperties(props)
+    except Exception:
+        pass
+
 class MainWindow(QMainWindow):
     MODE_LABELS = {"full": "TUNNEL", "smart": "PROXY", "proxy": "PROXY"}
 
@@ -659,6 +676,19 @@ class MainWindow(QMainWindow):
         if scrollable:
             body = QScrollArea()
             body.setWidgetResizable(True)
+            # touch: drag anywhere to scroll (kinetic)
+            try:
+                from PySide6.QtWidgets import QScroller
+                from PySide6.QtWidgets import QScrollerProperties
+                sp = QScroller.scroller(body.viewport())
+                QScroller.grabGesture(body.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture)
+                props = sp.scrollerProperties()
+                # make it feel like native touch (faster, no overshoot)
+                props.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.08)
+                props.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.008)
+                sp.setScrollerProperties(props)
+            except Exception:
+                pass
             body.setFrameShape(QFrame.Shape.NoFrame)
             cont = QWidget()
             bl = QVBoxLayout(cont)
@@ -990,6 +1020,17 @@ class MainWindow(QMainWindow):
         self.apps_scroll = QScrollArea()
         self.apps_scroll.setWidgetResizable(True)
         self.apps_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        try:
+            from PySide6.QtWidgets import QScroller
+            from PySide6.QtWidgets import QScrollerProperties
+            sp2 = QScroller.scroller(self.apps_scroll.viewport())
+            QScroller.grabGesture(self.apps_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture)
+            props2 = sp2.scrollerProperties()
+            props2.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.08)
+            props2.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.008)
+            sp2.setScrollerProperties(props2)
+        except Exception:
+            pass
         self.apps_cont = QWidget()
         self.apps_rows = QVBoxLayout(self.apps_cont)
         self.apps_rows.setContentsMargins(4, 4, 4, 4)

@@ -50,3 +50,8 @@ flatpak run io.neodon.gui
 
 ## License
 MIT
+
+## Documentation
+- `docs/bazzite-neodon-vpn.md` — full restore guide (PROXY vs TUNNEL, presets, passwordless, touchscreen 2026-08-29)
+- `CHANGES.md` — what was tried / failed / succeeded (2026-08-29 touch + passwordless nagluho)
+- `state/CURRENT.md` in bazzite project — host state 19:48 VERIFIED 21/21
