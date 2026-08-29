@@ -571,8 +571,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Neodon VPN")
-        self.resize(500, 700)
-        self.setMinimumSize(480, 700)
+        self.resize(720, 700)
+        self.setMinimumSize(620, 680)
         self.servers = []
         self.lats = {}
         self._workers = []
@@ -801,18 +801,13 @@ class MainWindow(QMainWindow):
         hint2 = QLabel("Нажмите ↻, если не работает VPN")
         hint2.setObjectName("hint")
         sl.addWidget(hint2)
-        self.srv_list = QListWidget()
-        self.srv_list.setMinimumHeight(260)
-        self.srv_list.itemClicked.connect(lambda _item: self.select_server())
-        self.srv_list.itemPressed.connect(lambda _item: self.select_server())
-        sl.addWidget(self.srv_list)
-        srow = QHBoxLayout()
-        self.btn_select = QPushButton("Выбрать")
-        self.btn_select.setObjectName("accent")
-        self.btn_select.clicked.connect(self.select_server)
-        srow.addStretch()
-        srow.addWidget(self.btn_select)
-        sl.addLayout(srow)
+        # servers: 2-column grid inside main scroll — no inner scroll, drag anywhere scrolls page
+        self.srv_container = QWidget()
+        self.srv_grid = QGridLayout(self.srv_container)
+        self.srv_grid.setContentsMargins(0, 0, 0, 0)
+        self.srv_grid.setSpacing(8)
+        self.srv_grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+        sl.addWidget(self.srv_container)
 
         hint = QLabel("Нажмите на сервер, чтобы подключиться или сменить его. Если VPN не работает — переключите сервер или нажмите ↻.")
         hint.setObjectName("hint")
@@ -1209,7 +1204,12 @@ class MainWindow(QMainWindow):
             pass
 
     def render_servers(self):
-        self.srv_list.clear()
+        # clear grid
+        while self.srv_grid.count():
+            child = self.srv_grid.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+        COLS = 2
         for i, s in enumerate(self.servers):
             remark = s.get("remarks") or s.get("address") or ("Сервер %d" % (i + 1))
             code = flag_code(remark)
@@ -1221,9 +1221,9 @@ class MainWindow(QMainWindow):
                 lat = '<span style="color:#E5484D">✗</span>'
             else:
                 lat = "—"
-            item = QListWidgetItem()
-            item.setData(Qt.ItemDataRole.UserRole, i)
             row = _ClickFrame(lambda p=i: self._select_server_idx(p))
+            row.setObjectName("serverCard")
+            row.setCursor(Qt.CursorShape.PointingHandCursor)
             hl = QHBoxLayout(row)
             hl.setContentsMargins(10, 8, 10, 8)
             hl.setSpacing(10)
@@ -1240,14 +1240,16 @@ class MainWindow(QMainWindow):
             active = bool(self.active_addr) and s.get("address") == self.active_addr
             if active:
                 head += "  ●"
-                item.setBackground(QColor(20, 37, 30))
             txt = QLabel("%s\n%s · %s" % (head, server_desc(s), lat))
+            txt.setWordWrap(True)
             hl.addWidget(txt, 1)
-            rc = row.sizeHint()
-            rc.setHeight(rc.height() + 6)
-            item.setSizeHint(rc)
-            self.srv_list.addItem(item)
-            self.srv_list.setItemWidget(item, row)
+            r = i // COLS
+            c = i % COLS
+            self.srv_grid.addWidget(row, r, c)
+            if active:
+                row.setStyleSheet("QFrame#serverCard { background:#14251E; border:1px solid #1A4A2E; border-radius:10px; }")
+            else:
+                row.setStyleSheet("QFrame#serverCard { background:#1C1C22; border:1px solid #26262E; border-radius:10px; }")
 
     def start_ping(self):
         if not self.servers:
@@ -1262,14 +1264,20 @@ class MainWindow(QMainWindow):
         self.render_servers()
 
     def select_server(self):
-        item = self.srv_list.currentItem()
-        if item is None:
-            self.statusBar().showMessage("Сначала выберите сервер в списке", 5000)
-            return
+        # legacy QListWidget removed — grid uses direct _select_server_idx on card click
+        # keep btn compat: pick active or 0
         if self._op_in_progress:
             self.statusBar().showMessage("Операция уже выполняется — подождите…", 4000)
             return
-        idx = item.data(Qt.ItemDataRole.UserRole)
+        if not self.servers:
+            self.statusBar().showMessage("Нет серверов", 5000)
+            return
+        idx = 0
+        if self.active_addr:
+            for j, _s in enumerate(self.servers):
+                if _s.get("address") == self.active_addr:
+                    idx = j
+                    break
         start_after = self.state != "CONNECTED"
         mode = self.desired if self.desired in ("full", "smart") else "smart"
         self._op_in_progress = True

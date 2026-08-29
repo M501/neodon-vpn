@@ -2,6 +2,24 @@
 
 > Правило проекта (с 2026-08-29, по требованию владельца): **любое изменение по любому проекту — в папке проекта И в GitHub через коммиты с текстом**. Без этого проект считается голым. При сбое Hermes/сессии — продолжение из файлов, не из памяти.
 
+
+## 2026-08-29 19:19 — Grid 2-колонки для серверов (720px) + убрать вложенный скролл
+
+### Что сделано
+- **Окно 500→720px**: `MainWindow.resize(500,700)→720,700`, `setMinimumSize(480→620,680)` — используем ширину для 2 колонок, на Ally X 1280×720 влезает полностью (проверено `positions 0,2` на рабочем столе).
+- **Серверы QListWidget → QGridLayout 2×N**: `srv_list QListWidget (260px, itemClicked) + btn Выбрать + srow` удалены, заменены на `srv_container QWidget + srv_grid QGridLayout (spacing 8, AlignTop)` в том же `_card sl` (760-810). `render_servers` теперь `while grid.count(): take/delete` + `COLS=2` `row=i//2 col=i%2 addWidget`. Карточки `QFrame#serverCard` 1px border radius10, активная `#14251E/#1A4A2E`, остальные `#1C1C22/#26262E`, `wordWrap True`, `PointingHand`. `select_server` fallback: без `currentItem`, берёт `active_addr` или 0.
+- **Убран вложенный скролл**: серверы теперь внутри главного `_page` QScrollArea (scrollable=True) — один общий drag-to-scroll (QScroller уже на body), никаких внутренних `QListWidget` скроллов.
+
+### Что пробовали / не сработало
+- `spectacle -b -a` дал `332B` заглушку без WAYLAND_DISPLAY → нужен `XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0`, `pkill -9` обязателен перед чистым десктопом.
+- `nohup` без env → `xcb plugin could not load` → `env WAYLAND_DISPLAY=wayland-0 QT_QPA_PLATFORM=wayland` или `systemd-run --user neodon-gui` (наследует wayland).
+- `t_backend` параллельно `verify` → `flock .toggle.lock` deadlock → S3 10× FAIL `inactive dead 79.139` (серийно PASS, капитал S4-S16 PASS).
+- Вставка `neodon-hostctl start smart` внутрь строки `info "S3 ..."` сломала кавычки → `bash -n rc1` → починён через python replace без `\r`.
+- Vision `503 both backends failed` на `1.7M PNG` → downscale PIL `640×360 82%` или `640×822 85%`.
+
+### Проверка
+- `python3 -m py_compile OK`, `QT_QPA_PLATFORM=offscreen rc0`, `QT_QPA_PLATFORM=wayland (76757) pgrep rc0`, `spectacle -b -a grid_way.png 1275×1215 147K → grid_way_small.jpg 85K`, `grep -c QGridLayout 6 / srv_grid 2 / srv_container 1`.
+
 ## 2026-08-29 — Touchscreen (Ally X) + Passwordless наглухо + Чёрный экран
 
 ### Что сделано

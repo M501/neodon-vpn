@@ -327,6 +327,12 @@ ip link show tun0 && sudo -n firewall-cmd --direct --get-all-rules | wc -l
 - Запуск через `systemd-run --user neodon-gui` (наследует `WAYLAND_DISPLAY=wayland-0`)
 - `offscreen`/`wayland` rc0, `pgrep` single-instance.
 
+## Grid 2-колонки (2026-08-29 19:19)
+
+- `QListWidget 260px` → `QGridLayout 2×N` в `_card sl` (`srv_container` + `srv_grid` spacing 8, AlignTop), карточки `#serverCard` radius10, активная зелёная `#14251E`.
+- Окно `500×700→720×700` `min 620×680` — на 1280×720 всё в 2 ряда без вложенного скролла, драгаешь整个 страницу.
+- `render_servers` `COLS=2` `r=i//2 c=i%2`, `select_server` без `currentItem`.
+
 ## Траблшутинг
 
 | Симптом | Что делать |
