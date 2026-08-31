@@ -90,8 +90,6 @@ PRESETS = [
      True, ["domain:avito.st", "geosite:category-ru", "geosite:private", "regexp:.*\\.ru$", "regexp:.*\\.xn--p1ai$"], [], []),
     ("ru-traffic-direct", ".ru трафик напрямую", "📄", "Пропускает русский трафик напрямую, минуя прокси", False,
      True, ["domain:avito.st", "domain:vk.com", "geosite:category-ru", "regexp:.*\\.ru$", "regexp:.*\\.su$"], [], []),
-    ("traffic-rus", "Трафик Рус", "🇷🇺", "Эконом: только заблокированное через VPN, остальное мимо — не жрет квоту", True,
-     False, ["domain:avito.st", "domain:vk.com", "geosite:category-ru", "geosite:private", "regexp:.*\.ru$", "regexp:.*\.su$", "regexp:.*\.xn--p1ai$"], ["geosite:youtube", "geosite:google", "geosite:discord", "geosite:openai", "geosite:anthropic", "geosite:google-gemini", "geosite:instagram", "geosite:spotify", "geosite:tiktok", "geosite:telegram", "geosite:whatsapp", "geosite:cloudflare", "geosite:meta", "geosite:twitter", "geosite:twitch", "geosite:linkedin", "geosite:microsoft", "geosite:notion"], []),
     ("popular-ai", "Popular AI", "🤖", "Популярные нейросети через VPN, остальной трафик мимо VPN", True,
      False, [], ["geosite:category-ai-!cn", "geosite:category-ai-cn"], []),
     ("social-networks", "Social Networks", "💬", "Популярные соцсети через VPN, остальной трафик напрямую", True,
@@ -557,12 +555,12 @@ def _enable_kinetic(scroll_area):
     try:
         from PySide6.QtWidgets import QScroller, QScrollerProperties
         vp = scroll_area.viewport()
-        QScroller.grabGesture(vp, QScroller.ScrollerGestureType.LeftMouseButtonGesture)
         QScroller.grabGesture(vp, QScroller.ScrollerGestureType.TouchGesture)
+        QScroller.grabGesture(vp, QScroller.ScrollerGestureType.LeftMouseButtonGesture)
         sp = QScroller.scroller(vp)
         props = sp.scrollerProperties()
-        props.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.1)
-        props.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.01)
+        props.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.14)
+        props.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.05)
         props.setScrollMetric(QScrollerProperties.ScrollMetric.DragVelocitySmoothingFactor, 0.25)
         props.setScrollMetric(QScrollerProperties.ScrollMetric.DecelerationFactor, 0.12)
         sp.setScrollerProperties(props)
@@ -686,12 +684,12 @@ class MainWindow(QMainWindow):
                 from PySide6.QtWidgets import QScroller
                 from PySide6.QtWidgets import QScrollerProperties
                 sp = QScroller.scroller(body.viewport())
-                QScroller.grabGesture(body.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture)
                 QScroller.grabGesture(body.viewport(), QScroller.ScrollerGestureType.TouchGesture)
+                QScroller.grabGesture(body.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture)
                 props = sp.scrollerProperties()
                 # make it feel like native touch (faster, no overshoot)
-                props.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.08)
-                props.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.008)
+                props.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.2)
+                props.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.05)
                 sp.setScrollerProperties(props)
             except Exception:
                 pass
@@ -1025,11 +1023,11 @@ class MainWindow(QMainWindow):
             from PySide6.QtWidgets import QScroller
             from PySide6.QtWidgets import QScrollerProperties
             sp2 = QScroller.scroller(self.apps_scroll.viewport())
-            QScroller.grabGesture(self.apps_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture)
             QScroller.grabGesture(self.apps_scroll.viewport(), QScroller.ScrollerGestureType.TouchGesture)
+            QScroller.grabGesture(self.apps_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture)
             props2 = sp2.scrollerProperties()
-            props2.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.08)
-            props2.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.008)
+            props2.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.2)
+            props2.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.05)
             sp2.setScrollerProperties(props2)
         except Exception:
             pass
@@ -1228,7 +1226,7 @@ class MainWindow(QMainWindow):
                 lat = '<span style="color:#E5484D">✗</span>'
             else:
                 lat = "—"
-            row = _ClickFrame(lambda p=i: self._select_server_idx(p))
+            row = _ClickFrame(lambda e=None, p=i: self._select_server_idx(p))
             row.setObjectName("serverCard")
             row.setCursor(Qt.CursorShape.PointingHandCursor)
             hl = QHBoxLayout(row)
@@ -1269,6 +1267,22 @@ class MainWindow(QMainWindow):
 
     def _ping_done(self):
         self.render_servers()
+
+    def _select_server_idx(self, idx):
+        if self._op_in_progress:
+            self.statusBar().showMessage("Операция уже выполняется — подождите…", 4000)
+            return
+        if not (0 <= idx < len(self.servers)):
+            self.statusBar().showMessage("Неверный сервер", 5000)
+            return
+        start_after = self.state != "CONNECTED"
+        mode = self.desired if self.desired in ("full", "smart") else "smart"
+        self._op_in_progress = True
+        self.pill.set_state("TRANSITIONING")
+        w = SelectWorker(idx, start_after=start_after, mode=mode)
+        w.done.connect(self._select_done)
+        w.start()
+        self._workers.append(w)
 
     def select_server(self):
         # legacy QListWidget removed — grid uses direct _select_server_idx on card click

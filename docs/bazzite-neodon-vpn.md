@@ -346,7 +346,7 @@ ip link show tun0 && sudo -n firewall-cmd --direct --get-all-rules | wc -l
 - `QSystemTrayIcon` `io.neodon.gui.svg` рядом со `steam/qBittorrent/Sync` (`StatusNotifierWatcher` :1.132 :1.138), `closeEvent hide + tray.showMessage`, меню `Показать/PROXY/TUNNEL/Выход`, `isSystemTrayAvailable true`.
 - `io.neodon.gui.desktop` один в `~/.local/share/applications/` + `~/Desktop/Neodon 0,2`.
 
-## Eco Traffic-Rus (2026-08-29 22:19)
+## Eco Traffic-Rus — REVERT 2026-08-30 23:07 (удалён, см. CHANGES) (2026-08-29 22:19)
 
 - `traffic-rus` теперь эконом: `global False final direct` + `direct RU` + `proxy только заблокированное (youtube/google/discord/openai...)` → Handy `huggingface.co` мимо квоты, YouTube через VPN.
 - `process_name` только `qbittorrent/steam` (wine убран).

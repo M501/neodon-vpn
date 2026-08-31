@@ -3,6 +3,49 @@
 > Правило проекта (с 2026-08-29, по требованию владельца): **любое изменение по любому проекту — в папке проекта И в GitHub через коммиты с текстом**. Без этого проект считается голым. При сбое Hermes/сессии — продолжение из файлов, не из памяти.
 
 
+
+
+## 2026-08-30 23:07 — REVERT к V2RayTun community (6-8 пресетов) — убрать Traffic-Rus + learned
+
+### Что сделано
+- **Убран `traffic-rus` полностью**: `gen_profiles.py: PRESETS` — удалён кортеж `("traffic-rus", ...)` (был eco `False global proxy 18 доменов 31 rules final direct`), `neodon-vpn.py: PRESETS` — удалён `("traffic-rus", "Трафик Рус", ...)`, `neodon-gen-config.py` — удалён `# L1 learned` блок (`rule_set learned` + `policy-cache.json` inject). `SD /app/neodon-vpn.py` синхрон. `traffic-rus.json` удалён из `profiles_out` и `singbox/profiles`.
+- **Убран smart daemon**: `neodon-policy.service` `stop+disable` + `rm /etc/systemd/user/neodon-policy.service` + `daemon-reload` + `rm ~/AI/singbox/policy-cache.json ~/AI/neodon-policy/policy.log/meta.json` — `inactive`. `config.json/proxy/full` — удалён `rule_set learned` + `rule_set:learned -> proxy` (was 36→36 check OK, 4→4 full). `apply-profile.py` + `neodon-hostctl` — вычищен `traffic-rus` из `PROFILES` whitelist (`default|ai|...|basic-set`).
+- **Фикс `gen-config` syntax**: `rules.append({"process_name":...}, {"domain_suffix":...})` double-arg → два отдельных `append`, `huggingface.co`/`Telegram`/`learned` revert, `strict py_compile OK` 272 lines.
+- **Пресеты теперь 8 community + 3 legacy**: `ru-bez-vpn 12 rules final proxy`, `russia-mimo 12`, `ru-traffic-direct 13`, `popular-ai 10 final direct`, `social-networks 18`, `only-unavailable 26`, `socseti-vpn 17`, `basic-set 32` — **ровно как в V2RayTun** `v2raytun_presets.json` 8 шт. `default/ai/anti-censorship` — legacy `SKIP` (BASE_HARD only).
+- **Профиль сброшен на `default`**: `python3 apply-profile.py default → applied true → restarted sing-box.service` `hostctl status {"profile":"default","final":proxy}` `CONNECTED RU` 194.87.56.40. `sing-box check` 3/3 PASS.
+- **GUI улучшения сохранены**: `QScroller LeftMouse+Touch 0.05/0.14`, `720x700 grid 2-col srv_grid 7`, `QSystemTrayIcon tray hide 7`, `FI/IS 117/144B`, `auto-sub refresh_sub`, `SD 1631 lines` — не трогали, это UI а не правила.
+
+### Что пробовали / не сработало
+- Eco `traffic-rus final direct + proxy 18 blocked` жрал 1.1ГБ Handy `huggingface.co` мимо из-за `final proxy` vs `direct` + `process_name wine` не ловил `curl` внутри `pressure-vessel`. Убран.
+- `learned` `policy-cache.json: no such file` → `sing-box check FATAL rule-set[0] open ...` — починено удалением `rule_set` из `config.json` и `apply-profile.py` (8 lines).
+- `apply-profile.py` `unexpected indent` `route["rules"]=rs` — `IndentationError` на `else` 12 vs 16 пробелов — `fix_apply4.py` `            route["rules"] = rs`.
+
+### Проверка
+- `grep -c traffic-rus gen_profiles 0 neodon-vpn 0 learned gen-config 0` — чисто.
+- `ls profiles 11 files` (`traffic-rus.json` gone), `PROFILES=(default...basic-set)` 11.
+- `hostctl status profile:default smart CONNECTED`, `apply default check passed`, `sing-box check 3/3 PASS`, `grep -c QSystemTrayIcon 7 srv_grid 7`.
+
+
+## 2026-08-30 — WSL2 bazaar: найдены изменения OpenCode без тебя
+
+### Что было сделано без тебя (WSL2 Ubuntu, OpenCode 1.18.25, /root/projects/opencode-spec-kit-framework)
+- **Bazzite Hub**: `.opencode/specs/bazzite/` — фазовый родитель (001-remote-control Done, 002-audio-fix, 003-neodon-smart-proxy Level3 Ready 650LOC, P0/P1, spec/plan/tasks/checklist/decision-record). Skill `bazzite-remote-control` мигрирован из `C:/AI/HERMES/.hermes/skills/devops/ssh-remote-linux` + `OPENCODE_SSH_KIT.md` (12 md + 9 scripts) — helpers `.venv/ssh_run.py/run_root_pty.py`, Tailscale 100.68.190.115 prio1, HHD 4.1.5, SDDM, etc. `context-index.md` мост к legacy `vpn/001-008`.
+- **003-neodon-smart-proxy**: мега-автоматика per-domain DIRECT→VPN (YouTube auto-VPN, Ozon DIRECT, RU DIRECT, qBittorrent DIRECT, health cache TTL 5m + backoff, PAC vs sing-box dialer выбор ONE canonical ADR-002, watchdog+hostctl, Firefox PAC `prefs.js`). До 86% tasks done (T001-T024 [x], T025-T028 pending hardware MiMo). Критичные зависимости: sing-box 1.13 geosite удаление, Firefox PAC Flatpak, KDE system proxy.
+- **Git грязный**: 51 files changed + untracked `bazzite/` + `vpn/` + `research/` + `specs/042-044` etc. Не коммичен — требует `validate.sh`.
+
+### Что сделано Hermеs параллельно (Bazzite host, без тебя)
+- Touch QScroller (LeftMouse+Touch 0.05), grid 720px 2-col, tray hide, FI/IS flags, auto-sub refresh_sub, eco traffic-rus final direct (31 rules), policy-cache.json learned hot-reload + daemon neodon-policy.service active, sudoers NOPASSWD ALL + polkit broad, verify 21/21.
+- Host: Bazzite 43.20260420 F43 6.17.7, SD 58M sing-box 1.13.18 caps ep, 12 profiles, policy-cache 34B + 2 logged (example.org, youtube.googleapis), DEGRADED state due to relay (not config).
+
+### Проверка
+- `wsl -d Ubuntu -- ls /root/projects/opencode-spec-kit-framework/.opencode/specs/bazzite` → 001 Done, 002, 003 Ready
+- `ssh m26@192.168.3.4 ~/AI/neodon-hostctl status` → DEGRADED (relay, not config) smart traffic-rus CONNECTED true 144.31.128.75
+- `sing-box check` 3/3 PASS, `neodon-policy active`, GUI 1617 lines QScroller 22 Touch 3 srv_grid 7 QSystemTrayIcon 7
+
+### Открытый вопрос
+- Где WSL2 сохраняет свои правки? `/root/projects/opencode-spec-kit-framework` (WSL fs, не /mnt/c). Нужно решить: оставить как есть (WSL) или зеркалить в `C:/AI/Hermes_PROJECTS/bazzite` как у Hermes (file-folder). Пока — мост через `context-index.md`.
+
+
 ## 2026-08-29 19:19 — Grid 2-колонки для серверов (720px) + убрать вложенный скролл
 
 ### Что сделано
