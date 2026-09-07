@@ -5,6 +5,17 @@
 
 
 
+## 2026-09-07 (5) — Motion-QA стенд: GSR-запись экрана + PTS-джанк + батарейный контракт
+
+### Что сделано
+- `gpu-screen-recorder` Flatpak system-wide (KMS `-w screen`, eDP-1, 1080p30, без портала/кликов/рута). CLI: `flatpak run --command=gpu-screen-recorder` (дефолтный run — GUI-обёртка, висела на экране — убита через `flatpak kill`, десктоп чист).
+- `scripts/qa-motion.sh` (хост `~/AI/qa-motion.sh`): запись N=3–15с → mp4 + PTS-сводка (`frames/gaps>100ms/maxgap`) + кадр jpg + проверка GSR-OFF. Грабли: вывод только в ~ (sandbox-/tmp умирает), `frame=pkt_pts_time` пуст в этом ffprobe — рабочий `packet=pts_time`.
+- Проверено: 5с → 143 кадра, gaps 0, maxgap 34мс; кадр просмотрен глазами (KDE десктоп виден). Тестовые mp4/jpg и /tmp-мусор удалены.
+
+### Батарейный контракт (портатив, святое)
+- Никаких демонов/автозапусков/кронов: GSR только on-demand по `qa-motion.sh`, самолимит `timeout`, после — `GSR-OFF` проверка. Простоя цены ноль по построению.
+- Правило для всех будущих QA-рук: живая запись — секунды и по команде; тяжёлое (pytest-qt) — на Windows-венве, не на хосте.
+
 ## 2026-09-07 (4) — МЕГА-АУДИТ: parity доказан, server.sh починен, все режимы живьём
 
 ### Паритет traffic rules — AUDIT-OK (`scripts/audit_parity.py`, 5/5)
