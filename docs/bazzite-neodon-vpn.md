@@ -393,3 +393,13 @@ ip link show tun0 && sudo -n firewall-cmd --direct --get-all-rules | wc -l
 
 ---
 *SD source: /run/media/m26/0000-D182/neodon-vpn (sing-box 58M, sha 8cb29c5b, 2026-08-22) · Host: bazzite 43.20260420 · Doc: 2026-08-25*
+
+## Дополнение 2026-09-07 — parity PROXY + DNS-архитектура + мега-аудит
+
+- **Пресеты**: 8 community-профилей = точные клоны v2RayTun (проверено `scripts/audit_parity.py`: спеки == эталону, диск == пересборке, провайдер 176/176, `AUDIT-OK`). Генератор `scripts/gen_full_profiles.py` (источник — v2fly `dlc.dat`, хост-копия `~/AI/singbox/geosite-dlc.dat`). Дефолт активный: `ru-bez-vpn` (клон подписочного `.RU без VPN` с Windows, final=proxy).
+- **Сервер по умолчанию**: `con.11.confstage.com:24531` (idx2, TCP+REALITY) — как выбранный на Windows; проверен живьём (CONNECTED, смена 0.45с). Список серверов тот же (10 шт, тот же sub).
+- **DNS-архитектура**: хост-стаб ISP травил NXDOMAIN мимо TUN → `scripts/dns-fix.sh` (static resolv `1.1.1.1` → TUN hijack; restore на off) + хуки в toggle; sing-box DNS `DoT 1.1.1.1 detour proxy` (final remote) + `default_domain_resolver local`. Урок: sing-box запрещает `final: fakeip` (`FATAL default server cannot be fakeip`).
+- **Починено в мега-аудит**: `singbox-server.sh` игнорировал `config-proxy.json` (смена сервера в PROXY молча не работала) — теперь патчит все 3 конфига + рестарт активного сервиса; проверено живьём.
+- **Проверено живьём 2026-09-07**: PROXY on 0.9с (префы FF, exit VPN), SMART CONNECTED, FULL CONNECTED (25 killswitch-правил, Tailscale гаснет штатно — тесты FULL только по LAN!), OFF (flush 25, стаб restored, ISP), switch 2/3/0, ozon direct 307, passwordless тихо.
+- **Известные расхождения с v2RayTun (осознанные)**: `qbittorrent/steam` forced-direct (экономия квоты), автообновление подписки только при старте GUI, `fbcdn.net` direct в пресете без `meta` (как в эталоне), `Work`-пресет не переносили (локальный).
+- **Отложено**: полный `neodon-verify.sh` (мутирует режимы — только когда хост свободен, не под живым тестом юзера); `security:tls` ветка в server.sh (нет таких серверов в подписке).
