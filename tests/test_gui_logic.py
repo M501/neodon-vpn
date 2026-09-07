@@ -295,3 +295,18 @@ def test_polls_dont_rehighlight_mid_toggle(monkeypatch):
     win._op_in_progress = False
     win._status_loaded(_json.dumps({"actual_state": "TRANSITIONING", "desired_mode": "full"}))
     assert win.btn_tunnel.isChecked(), "backend truth applies after op"
+
+
+def test_power_settle_ignores_double_tap(monkeypatch):
+    import time as _t
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.set_state("OFF")
+    calls = []
+    win.toggle = lambda mode: calls.append(mode)
+    win._settle_until = _t.monotonic() + 5
+    win.on_power()
+    assert calls == [], "tap right after OFF must not re-enable"
+    win._settle_until = 0
+    win.on_power()
+    assert calls == [win.mode], "deliberate press still works"

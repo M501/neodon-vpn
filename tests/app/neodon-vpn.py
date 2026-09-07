@@ -607,6 +607,7 @@ class MainWindow(QMainWindow):
         self._poll_busy = False
         self._fast_poll_until = 0
         self._last_desired = None
+        self._settle_until = 0
         self.connected = False
         self.mode = "smart"          # пользовательский: smart (PROXY) | full (TUNNEL)
         self.status = {}
@@ -1091,6 +1092,14 @@ class MainWindow(QMainWindow):
         self.power.setIcon(QIcon(icon_pixmap("power", self.power.iconSize().width(), "#F5F5F7")))
 
     def on_power(self):
+        try:
+            if time.monotonic() < getattr(self, "_settle_until", 0):
+                # double-tap guard: a tap landing right after OFF would
+                # re-enable the VPN and look like "off didn't work"
+                self.statusBar().showMessage("Операция только завершилась — подождите…", 3000)
+                return
+        except RuntimeError:
+            pass
         if self.connected or self.state in ("LOCKED", "FAILED", "DEGRADED"):
             self.toggle("off")
         else:
@@ -1113,6 +1122,7 @@ class MainWindow(QMainWindow):
 
     def _toggle_done(self, ok, out):
         self._op_in_progress = False
+        self._settle_until = time.monotonic() + 5
         self.statusBar().showMessage(out or ("Готово" if ok else "Ошибка"), 6000)
         self.poll_status()
 
@@ -1453,6 +1463,7 @@ class MainWindow(QMainWindow):
 
     def _select_done(self, ok, out):
         self._op_in_progress = False
+        self._settle_until = time.monotonic() + 5
         if ok:
             self.statusBar().showMessage("Сервер переключён", 4000)
             self.refresh_active_server()
