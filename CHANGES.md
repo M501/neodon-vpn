@@ -5,6 +5,27 @@
 
 
 
+## 2026-09-07 — Full-parity профили PROXY (v2fly-точный дамп) + DNS 1.1.1.1 + полный список провайдера
+
+### Что сделано
+- **Полные inline-профили (8 шт)**: новый `scripts/gen_full_profiles.py` (канон, заменил thin `gen_profiles.py` → `~/AI/gen_profiles.py.thin-legacy`). Источник — v2fly `dlc.dat` (та же линейка что geosite v2RayTun): чистый stdlib-парсер `scripts/parse_geosite.py`, все 25 тегов на месте вкл. `category-ai-!cn (180)`, `category-ai-cn (115)`, `category-ru (1092)`, `google-gemini (41)`, `vk (52)`. Покрытие: `ru-bez-vpn/russia-mimo/ru-traffic-direct ~1246 entries` (было ~20), `social-networks 1784`, `only-unavailable 1734`, `socseti-vpn 1210`, `basic-set 937`, `popular-ai 313`. Маппинг типов v2ray→sing-box: domain→suffix, full→domain, plain→keyword, regex→regex. Extras и порядок правил 1:1 с живых профилей (steam/hf/ozon direct, steam/udp-voice proxy, TLD catch-all, sniff/hijack-dns).
+- **Провайдерский RU-direct полностью**: было первые 40 из 338 (146 дублей, реально 176 уникальных: 171 suffix + 5 keyword) — теперь всё. Фикс и в `neodon-gen-config.py` (base-правила), и в 3 global-proxy профилях. `domain:gosuslugi.ru/max.ru/mail.ru/yandex.ru`, `ipv4-internet.yandex.net` и т.п. теперь direct, а не foreign-exit через proxy.
+- **DNS 8.8.8.8 → 1.1.1.1** в `neodon-gen-config.py` (паритет `vpn_dns` v2RayTun + allowlist киллсвитча). Регенерированы `config.json/proxy/full`, `sing-box check` 3/3 PASS.
+- **QA-утилита `scripts/check_routes.py`**: офлайн first-match симулятор `профиль + домен → outbound` (на хосте `~/AI/check_routes.py`).
+- **dlc.dat заперсистен** на хосте `~/AI/singbox/geosite-dlc.dat` (2.3M) для будущих регенераций (`DLC_DAT=... python3 ~/AI/gen_full_profiles.py`).
+
+### Что пробовали / не сработало
+- `SagerNet/sing-geosite.db + sing-box geosite export`: база рабочая, но нейминг MetaCubeX (`youtube@cn`), plain-тегов `google/youtube/...` нет — отброшено.
+- `dlc.dat` через `sing-box geosite export`: `FATAL unknown version` — у sing свой формат db; парсили сами.
+- Поиск `geosite.dat` v2RayTun на Windows-диске (Roaming/Local/ProgramData): только `shared_preferences.json` — эталон брали из него (9 пресетов, `vpn_mode proxy`, `vpn_dns 1.1.1.1`).
+- `journalctl` per-connection outbound-логов на `info` нет — live-атрибуция `домен→outbound` только через связку sim+exit-IP (честно, не натягивали).
+
+### Проверка
+- `apply-profile.py --check` 11/11 passed; активный `socseti-vpn` применён, `hostctl status CONNECTED` (smart, tun0 up, watchdog ok).
+- Live: `ru-bez-vpn` (final proxy) `curl -x socks ipify → 94.183.209.109` (VPN-выход, не дом); `socseti-vpn`: direct ipify `79.139.134.190` (дом, верно для final direct), `youtube via socks 200`, `ozon direct 307`.
+- Sim-матрица `socseti-vpn`: `chatgpt.com/ytimg.com/youtu.be/cdninstagram.com/discordapp.net/tiktokv.com/whatsapp.net → proxy`; `gosuslugi.ru/max.ru/ozon.ru/vk.com → direct`. `ru-bez-vpn`: `ya.ru/dzen.ru/mail.ru/ipv4-internet.yandex.net → direct`, CDN → proxy-final.
+- Известно-общее с v2RayTun (не чинили, паритет): пресет `socseti-vpn` без `meta` → `fbcdn.net` direct и там, и там. Добавить `meta` — по слову.
+
 ## 2026-08-30 23:07 — REVERT к V2RayTun community (6-8 пресетов) — убрать Traffic-Rus + learned
 
 ### Что сделано

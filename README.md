@@ -1,57 +1,40 @@
-# Neodon VPN
+# neodon-vpn — проект внутри bazzite
 
-VPN client for Linux/Bazzite, inspired by v2RayTun.
+Подпроект VPN (v2RayTun-клон, sing-box 1.13.18) внутри `bazzite/` чтобы не мешать `framegen`/`freeze` контексту.
 
-## Features
-- PySide6 GUI (8 community presets)
-- sing-box 1.13.18 (TUN + PROXY modes)
-- Killswitch (L2 fail-closed)
-- Watchdog with failover
-- Flatpak build
-- CLI: neodon-hostctl status/start/stop/server N
+## Где что реально лежит (пока без физического переноса — указатели)
 
-## Installation on Bazzite
+- **Дока:** [`../../docs/bazzite-neodon-vpn.md`](../../docs/bazzite-neodon-vpn.md) — 24KB, SD→Host, PROXY vs TUNNEL, presets, passwordless
+- **Research:** [`../../.planning/research/neodon-restore-research.md`](../../.planning/research/neodon-restore-research.md)
+- **GSD фазы:** [`../../.planning/phases/06-neodon-restore-sd-to-host/`](../../.planning/phases/06-neodon-restore-sd-to-host/) + `07-…` + `08-…` + `ROADMAP.md` 06-08 + `REQUIREMENTS.md` NEODON-01..07
+- **Скрипты:** [`../../scripts/neodon-restore.sh`](../../scripts/neodon-restore.sh) / `neodon-passwordless.sh` / `neodon-verify.sh` → копии уедут в `~/AI/scripts/` на базе
+- **Хендофф:** `C:/Users/M25/Downloads/NEODON_V1_HANDOFF.md` (1669 строк, frozen 2026-08-18)
+- **Хост:** `~/AI` (sing-box, toggle, hostctl, singbox/*.json), `~/.config/systemd/user/` (3 юнита + boot)
 
-### 1. Install sing-box
-wget https://github.com/SagerNet/sing-box/releases/download/v1.13.18/sing-box-1.13.18-linux-amd64.tar.gz
-tar xzf sing-box-1.13.18-linux-amd64.tar.gz
-sudo cp sing-box-1.13.18-linux-amd64/sing-box /usr/local/bin/
+## Структура когда проектов станет 2+
 
-### 2. Clone repository
-git clone https://github.com/YOUR_USERNAME/neodon-vpn.git ~/AI/neodon-vpn
-cd ~/AI/neodon-vpn
-chmod +x *.sh neodon-hostctl
+```
+bazzite/projects/
+├── neodon-vpn/   ← ты тут (этот README = индекс)
+└── framegen/     ← следующий проект — тогда физически перенесём docs/scripts сюда
+```
 
-### 3. Setup subscription
-python3 ~/AI/neodon-sub/neodon-sub.py
+Пока второй проект не активен — файлы остаются в `bazzite/docs|scripts|.planning` чтобы не ломать GSD (`.planning` живёт только в корне). Перенос — одна команда `git mv` когда понадобится.
 
-### 4. Flatpak (GUI)
-cd ~/AI/neodon-flatpak
-flatpak run org.flatpak.Builder --user --force-clean --repo=repo builddir io.neodon.gui.json
-flatpak install --user repo io.neodon.gui
 
-## Usage
+## Фактически сейчас (2026-08-28 19:48, VERIFY 21/21 PASS)
 
-### CLI
-~/AI/neodon-hostctl status
-~/AI/neodon-hostctl start smart
-~/AI/neodon-hostctl stop
-~/AI/neodon-hostctl server 1  # NL
+- **Копии в проекте:** `docs/bazzite-neodon-vpn.md` + `scripts/neodon-*.sh` — физические копии (ponytail: .planning остаётся в корне `bazzite/.planning` — GSD требует корень, туда не переносим).
+- **Хост:** `~/AI` восстановлен, `sing-box 1.13.18 caps ep`, `config.json/proxy/full` inline `1.1.1.1` без rule_set, `systemd --user` 4 юнита enabled, `PySide6 6.11.2`, `.desktop`×3 в `~/.local/share/applications/` + `~/Desktop`, `neodon-vpn` wrapper в `~/.local/bin`, `kbuildsycoca6` перезапущен.
+- **Доказательство:** `bash ~/AI/scripts/neodon-verify.sh` → `PASS=21 FAIL=0 VERIFY OK` (Gaming Mode не мешал, SD `/run/media/m26/0000-D182` 56M identical).
 
-### GUI
-flatpak run io.neodon.gui
 
-## Requirements
-- Bazzite Linux (or other Fedora-based)
-- Python 3.11+
-- PySide6
-- sing-box 1.13.18
-- KDE Plasma (Wayland)
+> **Правило (с 2026-08-29):** каждое изменение — в папке `bazzite/projects/neodon-vpn/` И в GitHub `M501/neodon-vpn` коммитом с текстом (что делал/пробовал/сработало/нет). Без этого проект голый. Восстановление из файлов, не из памяти Hermes.
 
-## License
-MIT
+## Запуск (на базе, SD вставлена)
 
-## Documentation
-- `docs/bazzite-neodon-vpn.md` — full restore guide (PROXY vs TUNNEL, presets, passwordless, touchscreen 2026-08-29)
-- `CHANGES.md` — what was tried / failed / succeeded (2026-08-29 touch + passwordless nagluho)
-- `state/CURRENT.md` in bazzite project — host state 19:48 VERIFIED 21/21
+```bash
+bash ~/AI/scripts/neodon-restore.sh      # Phase 6: SD→Host + sing-box 58M + caps
+bash ~/AI/scripts/neodon-passwordless.sh # Phase 7: sudoers/polkit + PROXY 10808 + TUNNEL tun0/killswitch
+bash ~/AI/scripts/neodon-verify.sh       # Phase 8: 8 тестов без пароля — критерий "ни одного sudo пароля"
+```
