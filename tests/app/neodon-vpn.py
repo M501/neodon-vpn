@@ -606,6 +606,7 @@ class MainWindow(QMainWindow):
         self._op_in_progress = False
         self._poll_busy = False
         self._fast_poll_until = 0
+        self._last_desired = None
         self.connected = False
         self.mode = "smart"          # пользовательский: smart (PROXY) | full (TUNNEL)
         self.status = {}
@@ -1125,6 +1126,23 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def _journal_transition(self, old, new, d):
+        """Persistent transition log: proves real reconnects vs pill flaps."""
+        try:
+            p = os.path.join(STATE_DIR, "transitions.log")
+            if os.path.exists(p) and os.path.getsize(p) > 20000:
+                with open(p) as f:
+                    tail = f.readlines()[-150:]
+                with open(p, "w") as f:
+                    f.writelines(tail)
+            with open(p, "a") as f:
+                f.write("%d %s->%s desired=%s exit=%s\n"
+                        % (int(time.time()), old, new,
+                           (d or {}).get("desired_mode") or "?",
+                           (d or {}).get("exit_ip") or "-"))
+        except OSError:
+            pass
+
     def set_state(self, s):
         """Single state entry: binds timer epoch, buttons, tray to one state."""
         s = (s or "OFF").upper()
@@ -1211,9 +1229,26 @@ class MainWindow(QMainWindow):
         if prof and prof != self.active_profile and prof in self.preset_btns:
             self.active_profile = prof
             self.render_presets()
-        _new = (d.get("actual_state") or "OFF").upper()
-        if _new != getattr(self, "state", None):
-            self._log_transition(getattr(self, "state", None), _new)
+        _raw = (d.get("actual_state") or "OFF").upper()
+        _cur = getattr(self, "state", None)
+        _desired_now = d.get("desired_mode")
+        if _raw == "CONNECTED":
+            self._off_streak = 0
+            _new = "CONNECTED"
+        elif (_cur == "CONNECTED"
+                and _raw in ("CONNECTING", "DEGRADED", "STARTING", "TRANSITIONING")
+                and _desired_now == getattr(self, "_last_desired", _desired_now)):
+            # wobble guard: one slow curl must not flap the pill/timer;
+            # user switching modes (desired changed) bypasses immediately
+            self._off_streak = getattr(self, "_off_streak", 0) + 1
+            _new = "CONNECTED" if self._off_streak < 3 else _raw
+        else:
+            self._off_streak = getattr(self, "_off_streak", 0) + 1
+            _new = _raw
+        self._last_desired = _desired_now
+        if _new != _cur:
+            self._log_transition(_cur, _new)
+            self._journal_transition(_cur, _new, d)
             if _new == "CONNECTED":
                 # honest ON-signal: script only said "switching", notify now
                 try:
@@ -1229,12 +1264,10 @@ class MainWindow(QMainWindow):
         self.state = _new
         self.connected = d.get("actual_state") == "CONNECTED"
         if self.state == "CONNECTED":
-            self._off_streak = 0
             if getattr(self, "_epoch", None) is None:
                 self._epoch = time.monotonic()
         else:
-            # hysteresis: one blip (slow curl/DNS) must not reset the timer
-            self._off_streak = getattr(self, "_off_streak", 0) + 1
+            # streak already counted above; timer clears only at 3 misses
             if self._off_streak >= 3:
                 self._epoch = None
         dm = d.get("desired_mode")

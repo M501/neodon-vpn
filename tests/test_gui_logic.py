@@ -233,3 +233,50 @@ def test_notify_on_connected_once(monkeypatch):
     win._status_loaded(_json.dumps({"actual_state": "CONNECTED", "exit_ip": "1.2.3.4"}))
     win._status_loaded(_json.dumps({"actual_state": "CONNECTED", "exit_ip": "1.2.3.4"}))
     assert len(calls) == 1, calls
+
+
+def test_state_hysteresis_holds_connected(monkeypatch):
+    import json as _json
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win._status_loaded(_json.dumps({"actual_state": "CONNECTED", "desired_mode": "smart"}))
+    win._status_loaded(_json.dumps({"actual_state": "DEGRADED", "desired_mode": "smart"}))
+    assert win.state == "CONNECTED", "1st blip must not flap the pill"
+    win._status_loaded(_json.dumps({"actual_state": "DEGRADED", "desired_mode": "smart"}))
+    assert win.state == "CONNECTED", "2nd blip must not flap the pill"
+    assert getattr(win, "_epoch", None) is not None
+    win._status_loaded(_json.dumps({"actual_state": "DEGRADED", "desired_mode": "smart"}))
+    assert win.state == "DEGRADED", "3rd miss adopts"
+    assert win._epoch is None
+
+
+def test_hard_states_apply_immediately(monkeypatch):
+    import json as _json
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win._status_loaded(_json.dumps({"actual_state": "CONNECTED", "desired_mode": "smart"}))
+    win._status_loaded(_json.dumps({"actual_state": "OFF", "desired_mode": "off"}))
+    assert win.state == "OFF"
+    win._status_loaded(_json.dumps({"actual_state": "CONNECTED", "desired_mode": "smart"}))
+    win._status_loaded(_json.dumps({"actual_state": "FAILED", "desired_mode": "smart"}))
+    assert win.state == "FAILED"
+
+
+def test_desired_change_bypasses_hysteresis(monkeypatch):
+    import json as _json
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win._status_loaded(_json.dumps({"actual_state": "CONNECTED", "desired_mode": "smart"}))
+    win._status_loaded(_json.dumps({"actual_state": "TRANSITIONING", "desired_mode": "proxy"}))
+    assert win.state == "TRANSITIONING", "user switch must show at once"
+
+
+def test_transition_journal_appends(monkeypatch, tmp_path):
+    import json as _json
+    m = app()
+    monkeypatch.setattr(m, "STATE_DIR", str(tmp_path))
+    win = _make_win(m, monkeypatch)
+    win._status_loaded(_json.dumps({"actual_state": "CONNECTING", "desired_mode": "smart"}))
+    win._status_loaded(_json.dumps({"actual_state": "CONNECTED", "desired_mode": "smart", "exit_ip": "9.9.9.9"}))
+    log = (tmp_path / "transitions.log").read_text()
+    assert "->CONNECTING" in log and "->CONNECTED" in log, log
