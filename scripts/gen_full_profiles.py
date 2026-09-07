@@ -140,7 +140,13 @@ def load_provider_direct():
             continue  # private/category-ru covered by dump+base
         if d.startswith("domain:"):
             d = d[len("domain:"):]
-        (suffix if "." in d else keyword).append(d)
+        # v2ray `domain:X` = X + subdomains (TLD catch-all for bare TLDs),
+        # NEVER substring: bare TLDs (ru/рф/...) must be suffix, not keyword
+        # (keyword "ru" matches *ru* anywhere, e.g. rutracker).
+        if "." in d or d.lower() in ("ru", "рф", "xn--p1ai", "su"):
+            suffix.append(d)
+        else:
+            keyword.append(d)
     return sorted(set(suffix)), sorted(set(keyword))
 
 
@@ -212,7 +218,23 @@ def build_profile(pid, gproxy, direct_specs, proxy_specs, geo, prov_sfx, prov_kw
             if acc[side][key]:
                 rules.append({key: acc[side][key], "outbound": out})
     rules.append({"domain_suffix": list(TLD_DIRECT), "outbound": "direct"})
-    return {"rules": rules, "final": "proxy" if gproxy else "direct"}
+    doc = {"rules": rules, "final": "proxy" if gproxy else "direct"}
+    # FakeIP bindings for TUN: proxy-side -> fakeip, direct-side -> remote
+    # (real IPs, ping-able), dns.final=fakeip catches the rest. Every TUN
+    # connection then carries an unambiguous domain: ECH-proof and immune to
+    # IP->domain map collisions on shared anycast IPs (Cloudflare/Meta).
+    # FakeIP reversal is outbound-agnostic, so direct still dials real IPs.
+    dns_rules = []
+    for key in ("domain_suffix", "domain", "domain_keyword",
+                "domain_regex"):
+        if acc["direct"][key]:
+            dns_rules.append({key: acc["direct"][key], "server": "remote"})
+    for key in ("domain_suffix", "domain", "domain_keyword",
+                "domain_regex"):
+        if acc["proxy"][key]:
+            dns_rules.append({key: acc["proxy"][key], "server": "fakeip"})
+    doc["dns_rules"] = dns_rules
+    return doc
 
 
 def main():

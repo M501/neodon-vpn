@@ -146,8 +146,11 @@ def build_route_rules(provider_cfg, preset_rules=None):
         if d.startswith("domain:"):
             d = d[len("domain:"):]
         full_direct.append(d)
-    sfx = sorted({x for x in full_direct if "." in x})
-    kw = sorted({x for x in full_direct if "." not in x})
+    sfx = sorted({x for x in full_direct
+                if "." in x or x.lower() in ("ru", "рф", "xn--p1ai", "su")})
+    kw = sorted({x for x in full_direct
+                 if "." not in x
+                 and x.lower() not in ("ru", "рф", "xn--p1ai", "su")})
     if sfx:
         rules.append({"domain_suffix": sfx, "outbound": "direct"})
     if kw:
@@ -167,9 +170,12 @@ def build_config(outbound, provider_cfg, with_tun, with_mixed, preset_final="pro
         "dns": {
             "servers": [
                 {"tag": "remote", "type": "tls", "server": "1.1.1.1", "detour": "proxy"},
-                {"tag": "local", "type": "udp", "server": "1.1.1.1"}
+                {"tag": "local", "type": "udp", "server": "1.1.1.1"},
+                {"tag": "fakeip", "type": "fakeip", "inet4_range": "198.18.0.0/15", "inet6_range": "fc00::/18"}
             ],
+            "rules": [],
             "final": "remote",
+            "independent_cache": True,
             "strategy": "ipv4_only"
         },
         "inbounds": [],
