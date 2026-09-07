@@ -5,7 +5,13 @@ export XDG_RUNTIME_DIR=/run/user/$(id -u)
 MODE_FILE=~/AI/singbox/.mode
 # mutex: сериализуем переключения (гонка двух toggles давала рассинхрон .mode/сервис)
 exec 9>~/AI/singbox/.toggle.lock
-flock 9
+# read-only статусы не ждут мьютекс: иначе toggle стоит в очереди
+# за медленными опросами (curl/питоны в status-json). writer'ы -
+# эксклюзив, status - fail-open (читает только marker/mode/profile).
+case "$1" in
+  status|status-json) flock -n 9 || true ;;
+  *) flock 9 ;;
+esac
 TRANS_MARKER=~/AI/singbox/.transitioning
 notify() { notify-send "VPN" "$1" 2>/dev/null || true; }
 set_mode() { echo "$1" > "$MODE_FILE"; }

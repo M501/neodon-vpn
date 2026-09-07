@@ -435,6 +435,7 @@ class ToggleWorker(QThread):
 
 class SelectWorker(QThread):
     done = Signal(bool, str)
+    phase = Signal(str)
 
     def __init__(self, idx, start_after=False, mode="smart"):
         super().__init__()
@@ -444,13 +445,15 @@ class SelectWorker(QThread):
 
     def run(self):
         cmd = host_cmd("neodon-hostctl server %d" % self.idx) if SANDBOX else "bash %s set %d" % (SERVER_SCRIPT, self.idx)
-        rc, out, err = run_cmd(cmd, 35)
+        self.phase.emit("Смена сервера…")
+        rc, out, err = run_cmd(cmd, 10)
         if rc != 0:
             self.done.emit(False, out or err or "не удалось сменить сервер")
             return
         if self.start_after:
+            self.phase.emit("Сервер выбран, подключение…")
             cmd2 = host_cmd("neodon-hostctl start %s" % self.mode) if SANDBOX else "bash %s %s" % (TOGGLE, self.mode)
-            rc2, out2, err2 = run_cmd(cmd2, 30)
+            rc2, out2, err2 = run_cmd(cmd2, 12)
             if rc2 != 0:
                 self.done.emit(False, out2 or err2 or "не удалось подключиться")
                 return
@@ -539,30 +542,47 @@ def ensure_rules():
 
 class _ClickFrame(QFrame):
     """Кликабельный QFrame (карточка-кнопка): QLabel-контент рендерится,
-    в отличие от QPushButton с layout (там дочерние QLabel пропадают)."""
+    в отличие от QPushButton с layout (там дочерние QLabel пропадают).
+    Tap-vs-drag: скролл заканчивается тем же release — без slop любой
+    отпуск пальца стрелял бы как тап. Порог 12px по Манхэттену."""
+    TAP_SLOP_PX = 12
+
     def __init__(self, on_click, parent=None):
         super().__init__(parent)
         self._cb = on_click
+        self._press_pos = None
+
+    def mousePressEvent(self, e):
+        try:
+            self._press_pos = e.position().toPoint()
+        except Exception:
+            self._press_pos = None
+        super().mousePressEvent(e)
+
     def mouseReleaseEvent(self, e):
         if e.button() == Qt.MouseButton.LeftButton and self.rect().contains(e.position().toPoint()):
-            self._cb()
+            pos = e.position().toPoint()
+            start = self._press_pos
+            if start is None or (pos - start).manhattanLength() <= self.TAP_SLOP_PX:
+                self._cb()
+        self._press_pos = None
         super().mouseReleaseEvent(e)
 
 
 
 def _enable_kinetic(scroll_area):
-    """Enable drag-to-scroll anywhere inside QScrollArea viewport."""
+    """Single kinetic-scroll helper (touch-only so taps always pass through).
+    ponytail: one place — tune Delay/Distance here if feel is off."""
     try:
         from PySide6.QtWidgets import QScroller, QScrollerProperties
         vp = scroll_area.viewport()
         QScroller.grabGesture(vp, QScroller.ScrollerGestureType.TouchGesture)
-        QScroller.grabGesture(vp, QScroller.ScrollerGestureType.LeftMouseButtonGesture)
         sp = QScroller.scroller(vp)
         props = sp.scrollerProperties()
-        props.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.14)
-        props.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.05)
-        props.setScrollMetric(QScrollerProperties.ScrollMetric.DragVelocitySmoothingFactor, 0.25)
-        props.setScrollMetric(QScrollerProperties.ScrollMetric.DecelerationFactor, 0.12)
+        props.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.06)
+        props.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.012)
+        props.setScrollMetric(QScrollerProperties.ScrollMetric.VerticalOvershootPolicy, QScrollerProperties.OvershootPolicy.OvershootAlwaysOff)
+        props.setScrollMetric(QScrollerProperties.ScrollMetric.HorizontalOvershootPolicy, QScrollerProperties.OvershootPolicy.OvershootAlwaysOff)
         sp.setScrollerProperties(props)
     except Exception:
         pass
@@ -598,10 +618,12 @@ class MainWindow(QMainWindow):
         self.timer_q.start(1000)
         self.poll_timer = QTimer(self)
         self.poll_timer.timeout.connect(self.poll_status)
-        self.poll_timer.start(4000)
+        self.poll_timer.start(8000)
+        self.sub_timer = QTimer(self)
+        self.sub_timer.timeout.connect(self.refresh_sub)
+        self.sub_timer.start(1800000)
         self.render_presets()
         self.refresh_sub()  # auto-refresh on every GUI start
-        self.fetch_exit_ip()
         self.poll_status()
 
     # ---- каркас ----
@@ -679,20 +701,8 @@ class MainWindow(QMainWindow):
         if scrollable:
             body = QScrollArea()
             body.setWidgetResizable(True)
-            # touch: drag anywhere to scroll (kinetic)
-            try:
-                from PySide6.QtWidgets import QScroller
-                from PySide6.QtWidgets import QScrollerProperties
-                sp = QScroller.scroller(body.viewport())
-                QScroller.grabGesture(body.viewport(), QScroller.ScrollerGestureType.TouchGesture)
-                QScroller.grabGesture(body.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture)
-                props = sp.scrollerProperties()
-                # make it feel like native touch (faster, no overshoot)
-                props.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.2)
-                props.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.05)
-                sp.setScrollerProperties(props)
-            except Exception:
-                pass
+            # touch: drag anywhere to scroll (kinetic, single helper)
+            _enable_kinetic(body)
             body.setFrameShape(QFrame.Shape.NoFrame)
             cont = QWidget()
             bl = QVBoxLayout(cont)
@@ -1019,18 +1029,7 @@ class MainWindow(QMainWindow):
         self.apps_scroll = QScrollArea()
         self.apps_scroll.setWidgetResizable(True)
         self.apps_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        try:
-            from PySide6.QtWidgets import QScroller
-            from PySide6.QtWidgets import QScrollerProperties
-            sp2 = QScroller.scroller(self.apps_scroll.viewport())
-            QScroller.grabGesture(self.apps_scroll.viewport(), QScroller.ScrollerGestureType.TouchGesture)
-            QScroller.grabGesture(self.apps_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture)
-            props2 = sp2.scrollerProperties()
-            props2.setScrollMetric(QScrollerProperties.ScrollMetric.MousePressEventDelay, 0.2)
-            props2.setScrollMetric(QScrollerProperties.ScrollMetric.DragStartDistance, 0.05)
-            sp2.setScrollerProperties(props2)
-        except Exception:
-            pass
+        _enable_kinetic(self.apps_scroll)
         self.apps_cont = QWidget()
         self.apps_rows = QVBoxLayout(self.apps_cont)
         self.apps_rows.setContentsMargins(4, 4, 4, 4)
@@ -1095,6 +1094,10 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Операция уже выполняется — подождите…", 4000)
             return
         self._op_in_progress = True
+        try:
+            self.set_state("TRANSITIONING")
+        except RuntimeError:
+            pass
         w = ToggleWorker(mode)
         w.done.connect(self._toggle_done)
         w.start()
@@ -1105,15 +1108,80 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(out or ("Готово" if ok else "Ошибка"), 6000)
         self.poll_status()
 
+    def _log_transition(self, old, new):
+        try:
+            tr = getattr(self, "_transitions", None)
+            if tr is None:
+                tr = self._transitions = []
+            tr.append((int(time.time()), old, new))
+            del tr[:-50]
+        except Exception:
+            pass
+
+    def set_state(self, s):
+        """Single state entry: binds timer epoch, buttons, tray to one state."""
+        s = (s or "OFF").upper()
+        old = getattr(self, "state", None)
+        if old != s:
+            self._log_transition(old, s)
+        self.state = s
+        if s == "CONNECTED":
+            if getattr(self, "_epoch", None) is None:
+                self._epoch = time.monotonic()
+        else:
+            self._epoch = None
+            try:
+                self.timer_lbl.setText("00:00:00")
+            except RuntimeError:
+                pass
+        try:
+            self.render_status()
+        except RuntimeError:
+            pass
+        self._sync_tray(s)
+
+    def _sync_tray(self, s):
+        tray = getattr(self, "tray", None)
+        if tray is None:
+            return
+        try:
+            srv = ""
+            d = getattr(self, "status", None) or {}
+            tag = d.get("server_tag") or ""
+            if tag:
+                srv = " · " + tag.split("]")[-1].strip()[:24]
+            human = {"CONNECTED": "ON", "TRANSITIONING": "переход…",
+                     "STARTING": "переход…", "CONNECTING": "переход…",
+                     "STOPPING": "переход…"}.get(s, s)
+            tray.setToolTip("Neodon VPN — %s%s" % (human, srv))
+            names = {"CONNECTED": "network-vpn-connected",
+                     "LOCKED": "network-vpn-acquiring",
+                     "FAILED": "network-error"}
+            if s in names and QIcon.hasThemeIcon(names[s]):
+                tray.setIcon(QIcon.fromTheme(names[s]))
+        except Exception:
+            pass
+
     def tick(self):
-        if self.connected:
-            ep = active_epoch()
-            if ep:
-                s = max(0, int(time.time() - ep))
-                self.timer_lbl.setText("%02d:%02d:%02d" % (s // 3600, (s // 60) % 60, s % 60))
+        ep = getattr(self, "_epoch", None)
+        if ep:
+            s = max(0, int(time.monotonic() - ep))
+            self.timer_lbl.setText("%02d:%02d:%02d" % (s // 3600, (s // 60) % 60, s % 60))
+
+    def _prune_workers(self):
+        alive = []
+        for w in getattr(self, "_workers", []):
+            try:
+                if w.isRunning():
+                    alive.append(w)
+            except (RuntimeError, AttributeError):
+                pass
+        self._workers = alive
 
     def poll_status(self):
+        self._prune_workers()
         if self._poll_busy:
+            self._poll_skipped = getattr(self, "_poll_skipped", 0) + 1
             return
         self._poll_busy = True
         w = CmdWorker(host_cmd("neodon-hostctl status") if SANDBOX else "bash %s status-json" % TOGGLE, 10)
@@ -1136,8 +1204,20 @@ class MainWindow(QMainWindow):
         if prof and prof != self.active_profile and prof in self.preset_btns:
             self.active_profile = prof
             self.render_presets()
-        self.state = (d.get("actual_state") or "OFF").upper()
+        _new = (d.get("actual_state") or "OFF").upper()
+        if _new != getattr(self, "state", None):
+            self._log_transition(getattr(self, "state", None), _new)
+        self.state = _new
         self.connected = d.get("actual_state") == "CONNECTED"
+        if self.state == "CONNECTED":
+            self._off_streak = 0
+            if getattr(self, "_epoch", None) is None:
+                self._epoch = time.monotonic()
+        else:
+            # hysteresis: one blip (slow curl/DNS) must not reset the timer
+            self._off_streak = getattr(self, "_off_streak", 0) + 1
+            if self._off_streak >= 3:
+                self._epoch = None
         dm = d.get("desired_mode")
         self.desired = "full" if dm == "full" else "smart"
         if self.state == "OFF":
@@ -1281,6 +1361,10 @@ class MainWindow(QMainWindow):
         self.pill.set_state("TRANSITIONING")
         w = SelectWorker(idx, start_after=start_after, mode=mode)
         w.done.connect(self._select_done)
+        try:
+            w.phase.connect(lambda s: self.statusBar().showMessage(s, 4000))
+        except RuntimeError:
+            pass
         w.start()
         self._workers.append(w)
 
@@ -1305,6 +1389,10 @@ class MainWindow(QMainWindow):
         self.pill.set_state("TRANSITIONING")
         w = SelectWorker(idx, start_after=start_after, mode=mode)
         w.done.connect(self._select_done)
+        try:
+            w.phase.connect(lambda s: self.statusBar().showMessage(s, 4000))
+        except RuntimeError:
+            pass
         w.start()
         self._workers.append(w)
 
@@ -1318,17 +1406,6 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Ошибка: %s" % (out or "?"), 8000)
             self.pill.set_state(self.state or "OFF")
         self.poll_status()
-
-    def fetch_exit_ip(self):
-        if self.mode == "smart":
-            cmd = host_cmd("curl -s -m 8 https://api.ipify.org") if SANDBOX else "curl -s -m 8 https://api.ipify.org"
-        else:
-            cmd = host_cmd("curl -s -m 8 https://api.ipify.org") if SANDBOX else "curl -s -m 8 https://api.ipify.org"
-        w = CmdWorker(cmd, 10)
-        w.ok.connect(lambda out: self.status_meta_ip(out.strip()))
-        w.fail.connect(lambda _: None)
-        w.start()
-        self._workers.append(w)
 
     def status_meta_ip(self, ip):
         # exit ip уже приходит в status-json; здесь дублируем для информации
@@ -1379,16 +1456,44 @@ class MainWindow(QMainWindow):
         self.sub_used.setText("N/A")
         self.sub_expire.setText(sub_expire(None))
 
+    def _sub_cache_or_reason(self, out, line):
+        if not (out or "").strip():
+            reason = "Нет ответа сети"
+        elif not line:
+            reason = "Нет userinfo в ответе"
+        else:
+            reason = "Пустая квота (total=0)"
+        try:
+            with open(os.path.join(STATE_DIR, "sub-cache.json")) as f:
+                c = json.load(f)
+            return reason, (c.get("pct", 0), c.get("used", ""), c.get("expire", ""))
+        except (OSError, ValueError):
+            return reason, None
+
     def _apply_sub_info(self, out):
-        line = next((l for l in out.splitlines() if "subscription-userinfo" in l.lower()), "")
+        line = next((l for l in (out or "").splitlines() if "subscription-userinfo" in l.lower()), "")
         info = parse_sub_info(line)
         used, total = sub_used_total(info)
         if total > 0:
             self.sub_progress.setValue(sub_used_pct(info))
             self.sub_used.setText(sub_summary(info))
+            try:
+                with open(os.path.join(STATE_DIR, "sub-cache.json"), "w") as f:
+                    json.dump({"pct": sub_used_pct(info), "used": sub_summary(info),
+                               "expire": sub_expire(info), "ts": int(time.time())}, f)
+            except OSError:
+                pass
         else:
-            self.sub_progress.setValue(0)
-            self.sub_used.setText("N/A")
+            reason, cached = self._sub_cache_or_reason(out, line)
+            if cached:
+                self.sub_progress.setValue(cached[0])
+                self.sub_used.setText(cached[1] + " (кэш)")
+                self.sub_expire.setText(cached[2])
+            else:
+                self.sub_progress.setValue(0)
+                self.sub_used.setText("N/A")
+            self.statusBar().showMessage(reason, 6000)
+            return
         self.sub_expire.setText(sub_expire(info))
 
     def _sub_loaded(self, out):
@@ -1452,7 +1557,10 @@ class MainWindow(QMainWindow):
         # minimize to tray instead of quit — like steam/qbit near clock
         if getattr(self, "_really_quit", False):
             for w in list(self._workers):
-                w.wait(1500)
+                try:
+                    w.wait(200)
+                except RuntimeError:
+                    pass
             try:
                 super().closeEvent(event)
             except Exception:
@@ -1477,7 +1585,10 @@ class MainWindow(QMainWindow):
             return
         # fallback: no tray available — quit as before
         for w in list(self._workers):
-            w.wait(1500)
+            try:
+                w.wait(200)
+            except RuntimeError:
+                pass
         try:
             super().closeEvent(event)
         except Exception:
