@@ -280,3 +280,18 @@ def test_transition_journal_appends(monkeypatch, tmp_path):
     win._status_loaded(_json.dumps({"actual_state": "CONNECTED", "desired_mode": "smart", "exit_ip": "9.9.9.9"}))
     log = (tmp_path / "transitions.log").read_text()
     assert "->CONNECTING" in log and "->CONNECTED" in log, log
+
+
+def test_polls_dont_rehighlight_mid_toggle(monkeypatch):
+    import json as _json
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.set_mode("smart")
+    assert win.btn_proxy.isChecked()
+    win._op_in_progress = True
+    win._status_loaded(_json.dumps({"actual_state": "TRANSITIONING", "desired_mode": "full"}))
+    assert win.btn_proxy.isChecked(), "stale poll must not flip highlight mid-toggle"
+    assert not win.btn_tunnel.isChecked()
+    win._op_in_progress = False
+    win._status_loaded(_json.dumps({"actual_state": "TRANSITIONING", "desired_mode": "full"}))
+    assert win.btn_tunnel.isChecked(), "backend truth applies after op"

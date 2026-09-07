@@ -28,7 +28,7 @@ case "$1" in
     ;;
 esac
 case "$1" in
-  smart) bash ~/AI/singbox/dns-fix.sh apply || true; bash ~/AI/neodon-flatpak/firefox-proxy.sh restore || true; stop_all; fw_flush; set_mode smart; if systemctl --user start sing-box.service; then wd_reset; echo "VPN SMART switching..."; notify "переключение на SMART…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
+  smart) bash ~/AI/singbox/dns-fix.sh apply || true; bash ~/AI/neodon-flatpak/firefox-proxy.sh restore || true; stop_all; fw_flush; set_mode smart; if systemctl --user start sing-box.service; then (curl -s -m 12 https://api.ipify.org >/dev/null 2>&1 &); wd_reset; echo "VPN SMART switching..."; notify "переключение на SMART…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
   full)
     bash ~/AI/neodon-flatpak/firefox-proxy.sh restore || true
     stop_all
@@ -40,16 +40,17 @@ case "$1" in
       notify "FULL FAILED — service start error (firewall LOCKED)"
       exit 1
     fi
-    for i in $(seq 1 15); do
+    (curl -s -m 14 https://api.ipify.org >/dev/null 2>&1 &)
+    for i in $(seq 1 25); do
       systemctl --user is-active sing-box-full.service >/dev/null 2>&1 && break
-      sleep 1
+      sleep 0.2
     done
     if ! systemctl --user is-active sing-box-full.service >/dev/null 2>&1; then
       echo "FULL FAILED — service not active; firewall state: $(sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null | wc -l) rules; if LOCKED run 'toggle off' to unlock"
       notify "FULL FAILED — service not active (firewall LOCKED)"
       exit 1
     fi
-    sleep 2
+    for _t in $(seq 1 15); do ip link show tun0 >/dev/null 2>&1 && break; sleep 0.2; done
     if ! ip link show tun0 >/dev/null 2>&1; then
       echo "FULL FAILED — tun0 missing (firewall LOCKED, fail-closed). Run 'toggle off' to unlock."
       notify "FULL FAILED — no tun0 (firewall LOCKED)"
@@ -75,16 +76,14 @@ case "$1" in
       echo "FULL WARNING — exit не подтверждён, но firewall LOCKED (fail-closed). Run 'toggle off' to unlock."
     fi
     ;;
-  proxy) stop_all; fw_flush; set_mode proxy; bash ~/AI/singbox/dns-fix.sh apply || true; if systemctl --user start sing-box-proxy.service; then wd_reset; bash ~/AI/neodon-flatpak/firefox-proxy.sh apply || true; echo "VPN PROXY switching..."; notify "переключение на PROXY…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
+  proxy) stop_all; fw_flush; set_mode proxy; bash ~/AI/singbox/dns-fix.sh apply || true; if systemctl --user start sing-box-proxy.service; then (curl -s -m 12 -x socks5h://127.0.0.1:10808 https://api.ipify.org >/dev/null 2>&1 &); wd_reset; bash ~/AI/neodon-flatpak/firefox-proxy.sh apply || true; echo "VPN PROXY switching..."; notify "переключение на PROXY…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
   off)
     bash ~/AI/neodon-flatpak/firefox-proxy.sh restore || true
     stop_all
     sleep 2
-    N=$(sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null | wc -l)
-    if [ "$N" -gt 0 ]; then
-      sudo -n firewall-cmd --direct --remove-rules ipv4 filter OUTPUT_direct 2>/dev/null || true
-      sudo -n firewall-cmd --direct --remove-rules ipv6 filter OUTPUT_direct 2>/dev/null || true
-      echo "WARN: removed $N stuck rules"
+    if sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null | grep -q 'filter OUTPUT_direct 20 '; then
+      bash ~/AI/singbox/killswitch.sh remove >/dev/null 2>&1 || true
+      echo "unlocked killswitch leftovers"
     fi
     bash ~/AI/singbox/dns-fix.sh restore || true
     set_mode off
@@ -100,12 +99,15 @@ status-json)
       full) svc=sing-box-full.service ;;
       proxy) svc=sing-box-proxy.service ;;
     esac
-    fw_rules=$(sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null | wc -l)
+    _fw_dump=$(sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null || true)
+    fw_rules=$(echo "$_fw_dump" | wc -l)
+    locked=false; echo "$_fw_dump" | grep -q 'filter OUTPUT_direct 20 ' && locked=true
     if ip link show tun0 >/dev/null 2>&1; then tun_up=true; else tun_up=false; fi
+    em=2; [ -f "$TRANS_MARKER" ] && em=5
     exit_ip=""
     case "$desired" in
-      full|smart) if [ "$tun_up" = true ]; then exit_ip=$(curl -s -m 2 https://api.ipify.org 2>/dev/null); else exit_ip=""; fi ;;
-      proxy) if (echo > /dev/tcp/127.0.0.1/10808) 2>/dev/null; then exit_ip=$(curl -s -m 2 -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null); else exit_ip=""; fi ;;
+      full|smart) if [ "$tun_up" = true ]; then exit_ip=$(curl -s -m $em https://api.ipify.org 2>/dev/null); else exit_ip=""; fi ;;
+      proxy) if (echo > /dev/tcp/127.0.0.1/10808) 2>/dev/null; then exit_ip=$(curl -s -m $em -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null); else exit_ip=""; fi ;;
     esac
     exit_ok=false
     if [ -n "$exit_ip" ]; then
@@ -121,7 +123,7 @@ status-json)
       if [ "$any_active" = true ]; then
         svc_state=active
         state=STOPPING
-      elif [ "$fw_rules" -gt 0 ]; then
+      elif [ "$locked" = true ]; then
         svc_state=inactive
         state=STOPPING
       else
@@ -148,7 +150,7 @@ status-json)
             fi
             ;;
           inactive|failed)
-            if [ "$fw_rules" -gt 0 ]; then state=LOCKED; else state=FAILED; fi
+            if [ "$locked" = true ]; then state=LOCKED; else state=FAILED; fi
             ;;
           *) state=FAILED ;;
         esac
@@ -165,7 +167,7 @@ except Exception:
 EOF
 )
     [ -n "$wd_fails" ] || wd_fails=0
-    if [ "$wd_status" = "locked" ] && [ "$fw_rules" -gt 0 ] && [ "$desired" != "off" ] && [ "$transitioning" != true ]; then
+    if [ "$wd_status" = "locked" ] && [ "$locked" = true ] && [ "$desired" != "off" ] && [ "$transitioning" != true ]; then
       state=LOCKED
     elif { [ "$wd_status" = "degraded" ]; } && [ "$svc_state" = "active" ] && [ "$desired" != "off" ] && [ "$transitioning" != true ]; then
       state=DEGRADED

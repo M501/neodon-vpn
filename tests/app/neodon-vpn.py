@@ -1282,7 +1282,10 @@ class MainWindow(QMainWindow):
                 pass
         if self.state in ("OFF", "FAILED", "DEGRADED", "LOCKED"):
             pass
-        self.set_mode(self.desired if self.desired in ("smart", "full") else "smart")
+        if not self._op_in_progress:
+            # polls must not re-highlight mid-toggle: backend .mode still
+            # shows the old mode during teardown, flipping buttons back
+            self.set_mode(self.desired if self.desired in ("smart", "full") else "smart")
         self.render_status()
         self.write_gui_state()
 
