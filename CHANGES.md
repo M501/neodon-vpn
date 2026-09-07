@@ -5,6 +5,18 @@
 
 
 
+## 2026-09-07 (2) — DNS через sing-box (корень «не открываются»): ISP-стаб травил NXDOMAIN мимо TUN
+
+### Что сделано
+- **Диагноз по живому проводу**: `resolvectl/nslookup` отдавали `NXDOMAIN` даже для рабочих доменов; хост-DNS (`127.0.0.53 → ISP 192.168.3.1`) идёт по loopback и никогда не входит в TUN → `hijack-dns` слеп, DNS-карты нет, TUN маршрутизирует только по SNI. Итог до фикса: `instagram TUN:000 за 0.03с при SOCKS:200`.
+- **sing-box DNS**: `remote = DoT 1.1.1.1 detour proxy` (final) + `local = udp 1.1.1.1` + `route.default_domain_resolver = local` (требование 1.13, `check` EXIT=0). Весь DNS чистый, без отравы.
+- **`scripts/dns-fix.sh`**: static `/etc/resolv.conf → nameserver 1.1.1.1` (идёт в TUN→hijack) с бэкапом симлинка; `restore` возвращает стаб. Хуки в `singbox-toggle.sh`: apply на smart/proxy/full, restore на off (включая `*)`-ветку). Static переживает ребут в обе стороны корректно, boot-хук не нужен.
+- **Копии для восстановления**: `scripts/singbox-toggle.sh` (IP заредактирован → `79.139.*` prefix-check, хост живьём с полным — эквивалентно), `scripts/neodon-gen-config.py`, `scripts/neodon-hostctl`.
+
+### Проверка
+- `nslookup youtube/instagram` → чистые IP (было NXDOMAIN); матрица TUN: `youtube 200, instagram 200 (был 000!), tiktok 200, discord 200, chatgpt 403 (=ответ сервера, как по SOCKS)`; `hostctl CONNECTED socseti-vpn`.
+- Транзиент после рестарта (~6с таймауты первых проб — DoT/vless warmup), само прошло, в журнале ошибок нет. Сервер не меняли (ws3; канон ws4 — только если будут жалобы на скорость).
+
 ## 2026-09-07 — Full-parity профили PROXY (v2fly-точный дамп) + DNS 1.1.1.1 + полный список провайдера
 
 ### Что сделано
