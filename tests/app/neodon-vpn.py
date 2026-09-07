@@ -925,7 +925,7 @@ class MainWindow(QMainWindow):
             ft = QLabel("остальное — через VPN" if gproxy else "остальное — напрямую")
             ft.setObjectName("hint")
             v.addWidget(ft)
-            vd = QLabel("✓ подтверждено" if verified else "○ не подтверждено")
+            vd = QLabel("✓ проверено вживую" if verified else "○ ещё не проверялось")
             vd.setObjectName("muted")
             vd.setStyleSheet("color: %s; font-size: 11px;" % ("#4ADE80" if verified else "#666"))
             v.addWidget(vd)
@@ -1298,13 +1298,6 @@ class MainWindow(QMainWindow):
         if _new != _cur:
             self._log_transition(_cur, _new)
             self._journal_transition(_cur, _new, d)
-            if _new == "CONNECTED":
-                # honest ON-signal: script only said "switching", notify now
-                try:
-                    subprocess.Popen(["notify-send", "Neodon VPN",
-                                      "Подключено — %s" % (d.get("exit_ip") or d.get("profile") or "")])
-                except Exception:
-                    pass
         try:
             if _fast_poll_wanted(_new, getattr(self, "_fast_poll_until", 0), time.monotonic()):
                 QTimer.singleShot(1500, self.poll_status)

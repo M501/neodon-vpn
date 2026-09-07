@@ -129,7 +129,7 @@ out=json.loads(sys.argv[1]); tag=sys.argv[2]
 sel={"tag": tag or out.get("server",""), "server": out["server"], "server_port": out["server_port"], "updated": time.strftime("%Y-%m-%dT%H:%M:%S")}
 open(os.path.expanduser("~/AI/singbox/selected-server.json"),"w").write(json.dumps(sel, ensure_ascii=False, indent=2))
 PYEOF3
-    _last="/tmp/neodon-last-notify"; _now=$(date +%s); _prev=$(cat "$_last" 2>/dev/null || echo 0); if [ $((_now - _prev)) -ge 10 ]; then notify-send "VPN" "Сервер: $name" 2>/dev/null || true; echo "$_now" > "$_last"; fi
+    _last="/tmp/neodon-last-notify"; _now=$(date +%s); _prev=$(cat "$_last" 2>/dev/null || echo 0); if [ $((_now - _prev)) -ge 10 ]; then :; echo "$_now" > "$_last"; fi
     echo "OK: переключено на сервер $name"
   else
     cp "$CFG.bak" "$CFG"

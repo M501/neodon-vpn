@@ -218,7 +218,7 @@ def test_toggle_arms_fast_poll(monkeypatch):
     assert win._fast_poll_until > _t.monotonic()
 
 
-def test_notify_on_connected_once(monkeypatch):
+def test_no_desktop_notify_on_connected(monkeypatch):
     import json as _json
     m = app()
 
@@ -232,7 +232,7 @@ def test_notify_on_connected_once(monkeypatch):
     win.set_state("CONNECTING")
     win._status_loaded(_json.dumps({"actual_state": "CONNECTED", "exit_ip": "1.2.3.4"}))
     win._status_loaded(_json.dumps({"actual_state": "CONNECTED", "exit_ip": "1.2.3.4"}))
-    assert len(calls) == 1, calls
+    assert calls == [], "no desktop spam, pill is the signal"
 
 
 def test_state_hysteresis_holds_connected(monkeypatch):

@@ -13,7 +13,7 @@ case "$1" in
   *) flock 9 ;;
 esac
 TRANS_MARKER=~/AI/singbox/.transitioning
-notify() { notify-send "VPN" "$1" 2>/dev/null || true; }
+notify() { :; }  # owner 2026-09-08: desktop popup spam off
 set_mode() { echo "$1" > "$MODE_FILE"; }
 wd_reset() { python3 -c 'import json,time;f="/home/m26/AI/singbox/watchdog-state.json";d=json.load(open(f));d.update({"consecutive_failures":0,"backoff_index":0,"next_due_ts":int(time.time()),"watchdog_status":"ok"});json.dump(d,open(f,"w"))'; }
 fw_flush() { bash ~/AI/singbox/killswitch.sh remove >/dev/null 2>&1 || true; }
