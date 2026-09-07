@@ -5,6 +5,24 @@
 
 
 
+## 2026-09-08 (13) — Spec 007: трафик-правила — паритет доказан + QA-скилл
+
+### Что там происходит (факты)
+- Таб = 11 пресетов v2RayTun 1:1 (формат globalProxy/direct/proxy/block);
+  «галочки» = radio активного + verified-бейджи. Активный = 15 route.rules.
+- Паритет: эталон шлёт yandex через category-ru→direct — мы так же;
+  рутрекер обе стороны через proxy. Оракул `probe_routing.py`: 23/23.
+- Live: rutracker→proxy, youtube→proxy, ya.ru→direct (один transient
+  dial-timeout при ротации egress, повтор 326мс — класс wobble).
+- TUNNEL игнорит пресеты by design (fail-closed) — подписано в UI.
+
+### Честный UI + тестилка
+- Карточки: census «напрямую/через VPN: N зап. · категории» (vision-пруф).
+  Бейджи не накручивал: True только с live-доказательством.
+- `neodon-qa` скилл + `qa/` ранбук (boundaries/gui-checklist/regression):
+  петля pytest→матрица→GUI→motion→timings, оракулы, ловушки, гэпы.
+- 25/25 pytest; деплой + рестарт одним инстансом.
+
 ## 2026-09-08 (12) — Spec 006: «не выключается в туннеле» = двойной тап
 
 ### Доказательство (transitions.log, не догадки)

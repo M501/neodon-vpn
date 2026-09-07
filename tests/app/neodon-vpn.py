@@ -115,6 +115,19 @@ PRESETS = [
 # Сохранённые профили V1 (остаются доступными):
 #   ai, anti-censorship — продолжают работать как были (файлы на хосте).
 
+def preset_summary(direct, proxy):
+    """One-line rule census for a preset card: counts only, no claims."""
+    parts = []
+    if direct:
+        parts.append("напрямую: %d зап." % len(direct))
+    if proxy:
+        parts.append("через VPN: %d зап." % len(proxy))
+    gs = sorted({e.split(":", 1)[1] for e in list(direct) + list(proxy)
+                 if e.startswith("geosite:")})
+    if gs:
+        parts.append("категории: " + ", ".join(gs[:6]) + ("…" if len(gs) > 6 else ""))
+    return " · ".join(parts) if parts else "без доп. записей"
+
 # ---------------------------------------------------------------------------
 # Иконки (SVG, в стиле v2RayTun: тонкие линии, текущий цвет)
 # ---------------------------------------------------------------------------
@@ -915,6 +928,10 @@ class MainWindow(QMainWindow):
             vd.setObjectName("muted")
             vd.setStyleSheet("color: %s; font-size: 11px;" % ("#4ADE80" if verified else "#666"))
             v.addWidget(vd)
+            sm = QLabel(preset_summary(direct, proxy))
+            sm.setObjectName("hint")
+            sm.setWordWrap(True)
+            v.addWidget(sm)
             hl.addLayout(v, 1)
             rb = QLabel()
             rb.setFixedSize(18, 18)

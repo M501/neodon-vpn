@@ -310,3 +310,20 @@ def test_power_settle_ignores_double_tap(monkeypatch):
     win._settle_until = 0
     win.on_power()
     assert calls == [win.mode], "deliberate press still works"
+
+
+def test_preset_summary_counts():
+    m = app()
+    s = m.preset_summary(["geosite:category-ru", "domain:avito.st"], ["geosite:youtube"])
+    assert "2 зап." in s and "1 зап." in s
+    assert "category-ru" in s and "youtube" in s
+    assert m.preset_summary([], []) == "без доп. записей"
+
+
+def test_traffic_cards_render(monkeypatch, tmp_path):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.navigate("traffic")
+    out = str(tmp_path / "traffic.png")
+    assert win.pages["traffic"].grab().save(out), "grab failed"
+    print("TRAFFIC-PNG:" + out)
