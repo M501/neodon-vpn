@@ -312,6 +312,38 @@ def test_power_settle_ignores_double_tap(monkeypatch):
     assert calls == [win.mode], "deliberate press still works"
 
 
+def test_busy_off_queues_and_drains(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.set_state("CONNECTED")
+    win.connected = True
+    calls = []
+    win.toggle = lambda mode: calls.append(mode)
+    win._op_in_progress = True
+    win.on_power()
+    assert calls == [], "busy off-press must not run yet"
+    assert win._pending == ("toggle", ("off",)), win._pending
+    win._op_in_progress = False
+    win._toggle_done(True, "ok")
+    assert calls == ["off"], "queued off must run after op"
+    assert win._pending is None
+
+
+def test_pending_last_wins(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.set_state("CONNECTED")
+    win.connected = True
+    win.toggle = lambda mode: None
+    win.mode = "full"
+    win._op_in_progress = True
+    win.on_power()
+    assert win._pending == ("toggle", ("off",))
+    win._settle_until = 0
+    win.set_mode("smart", restart=True)
+    assert win._pending == ("toggle", ("smart",)), win._pending
+
+
 def test_preset_summary_counts():
     m = app()
     s = m.preset_summary(["geosite:category-ru", "domain:avito.st"], ["geosite:youtube"])

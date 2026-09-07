@@ -621,6 +621,7 @@ class MainWindow(QMainWindow):
         self._fast_poll_until = 0
         self._last_desired = None
         self._settle_until = 0
+        self._pending = None
         self.connected = False
         self.mode = "smart"          # пользовательский: smart (PROXY) | full (TUNNEL)
         self.status = {}
@@ -1096,7 +1097,7 @@ class MainWindow(QMainWindow):
             b.style().unpolish(b)
             b.style().polish(b)
         if restart and changed and (self.connected or self.state not in ("OFF", "STOPPING")):
-            self.toggle(mode)
+            self._request_op("toggle", mode)
         elif mode in ("smart", "full"):
             self.desired = mode
             self.write_gui_state()
@@ -1118,9 +1119,29 @@ class MainWindow(QMainWindow):
         except RuntimeError:
             pass
         if self.connected or self.state in ("LOCKED", "FAILED", "DEGRADED"):
-            self.toggle("off")
+            self._request_op("toggle", "off")
         else:
-            self.toggle(self.mode)
+            self._request_op("toggle", self.mode)
+
+    def _request_op(self, kind, *args):
+        """Single funnel for user ops: run now, or queue last-wins while busy
+        (a dropped off-press during a switch looked like 'off is broken')."""
+        if self._op_in_progress:
+            self._pending = (kind, args)
+            self.statusBar().showMessage("Операция уже выполняется — поставлю в очередь…", 4000)
+            return
+        self._run_op(kind, *args)
+
+    def _run_op(self, kind, *args):
+        if kind == "toggle":
+            self.toggle(*args)
+        elif kind == "server":
+            self._start_server_worker(*args)
+
+    def _drain_pending(self):
+        pend, self._pending = self._pending, None
+        if pend:
+            self._run_op(pend[0], *pend[1])
 
     def toggle(self, mode):
         if self._op_in_progress:
@@ -1142,6 +1163,7 @@ class MainWindow(QMainWindow):
         self._settle_until = time.monotonic() + 5
         self.statusBar().showMessage(out or ("Готово" if ok else "Ошибка"), 6000)
         self.poll_status()
+        self._drain_pending()
 
     def _log_transition(self, old, new):
         try:
@@ -1431,12 +1453,12 @@ class MainWindow(QMainWindow):
         self.render_servers()
 
     def _select_server_idx(self, idx):
-        if self._op_in_progress:
-            self.statusBar().showMessage("Операция уже выполняется — подождите…", 4000)
-            return
         if not (0 <= idx < len(self.servers)):
             self.statusBar().showMessage("Неверный сервер", 5000)
             return
+        self._request_op("server", idx)
+
+    def _start_server_worker(self, idx):
         start_after = self.state != "CONNECTED"
         mode = self.desired if self.desired in ("full", "smart") else "smart"
         self._op_in_progress = True
@@ -1465,18 +1487,7 @@ class MainWindow(QMainWindow):
                 if _s.get("address") == self.active_addr:
                     idx = j
                     break
-        start_after = self.state != "CONNECTED"
-        mode = self.desired if self.desired in ("full", "smart") else "smart"
-        self._op_in_progress = True
-        self.pill.set_state("TRANSITIONING")
-        w = SelectWorker(idx, start_after=start_after, mode=mode)
-        w.done.connect(self._select_done)
-        try:
-            w.phase.connect(lambda s: self.statusBar().showMessage(s, 4000))
-        except RuntimeError:
-            pass
-        w.start()
-        self._workers.append(w)
+        self._request_op("server", idx)
 
     def _select_done(self, ok, out):
         self._op_in_progress = False
@@ -1489,6 +1500,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Ошибка: %s" % (out or "?"), 8000)
             self.pill.set_state(self.state or "OFF")
         self.poll_status()
+        self._drain_pending()
 
     def status_meta_ip(self, ip):
         # exit ip уже приходит в status-json; здесь дублируем для информации
