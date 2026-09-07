@@ -198,3 +198,38 @@ def test_toggle_optimistic(monkeypatch):
     win.toggle("smart")
     assert win._op_in_progress is True
     assert win.state == "TRANSITIONING"
+
+
+def test_fast_poll_wanted():
+    m = app()
+    assert m._fast_poll_wanted("CONNECTING", 100.0, 90.0) is True
+    assert m._fast_poll_wanted("DEGRADED", 100.0, 90.0) is True
+    assert m._fast_poll_wanted("CONNECTED", 100.0, 90.0) is False
+    assert m._fast_poll_wanted("CONNECTING", 100.0, 101.0) is False
+    assert m._fast_poll_wanted("OFF", 100.0, 90.0) is False
+
+
+def test_toggle_arms_fast_poll(monkeypatch):
+    import time as _t
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.set_state("OFF")
+    win.toggle("smart")
+    assert win._fast_poll_until > _t.monotonic()
+
+
+def test_notify_on_connected_once(monkeypatch):
+    import json as _json
+    m = app()
+
+    class _P:
+        def __init__(self, *a, **k):
+            calls.append(a)
+
+    calls = []
+    monkeypatch.setattr(m.subprocess, "Popen", _P)
+    win = _make_win(m, monkeypatch)
+    win.set_state("CONNECTING")
+    win._status_loaded(_json.dumps({"actual_state": "CONNECTED", "exit_ip": "1.2.3.4"}))
+    win._status_loaded(_json.dumps({"actual_state": "CONNECTED", "exit_ip": "1.2.3.4"}))
+    assert len(calls) == 1, calls

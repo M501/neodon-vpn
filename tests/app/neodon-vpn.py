@@ -479,6 +479,11 @@ class PingWorker(QThread):
         self.done.emit()
 
 
+def _fast_poll_wanted(new_state, deadline, now):
+    """Burst polls during transition instead of waiting out the 8s timer."""
+    return new_state in ("TRANSITIONING", "CONNECTING", "STARTING", "DEGRADED") and now < deadline
+
+
 # ---------------------------------------------------------------------------
 # UI: виджеты
 # ---------------------------------------------------------------------------
@@ -600,6 +605,7 @@ class MainWindow(QMainWindow):
         self._workers = []
         self._op_in_progress = False
         self._poll_busy = False
+        self._fast_poll_until = 0
         self.connected = False
         self.mode = "smart"          # пользовательский: smart (PROXY) | full (TUNNEL)
         self.status = {}
@@ -1094,6 +1100,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Операция уже выполняется — подождите…", 4000)
             return
         self._op_in_progress = True
+        self._fast_poll_until = time.monotonic() + 12
         try:
             self.set_state("TRANSITIONING")
         except RuntimeError:
@@ -1207,6 +1214,18 @@ class MainWindow(QMainWindow):
         _new = (d.get("actual_state") or "OFF").upper()
         if _new != getattr(self, "state", None):
             self._log_transition(getattr(self, "state", None), _new)
+            if _new == "CONNECTED":
+                # honest ON-signal: script only said "switching", notify now
+                try:
+                    subprocess.Popen(["notify-send", "Neodon VPN",
+                                      "Подключено — %s" % (d.get("exit_ip") or d.get("profile") or "")])
+                except Exception:
+                    pass
+        try:
+            if _fast_poll_wanted(_new, getattr(self, "_fast_poll_until", 0), time.monotonic()):
+                QTimer.singleShot(1500, self.poll_status)
+        except RuntimeError:
+            pass
         self.state = _new
         self.connected = d.get("actual_state") == "CONNECTED"
         if self.state == "CONNECTED":

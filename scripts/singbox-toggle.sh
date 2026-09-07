@@ -25,11 +25,10 @@ stop_all() {
 case "$1" in
   smart|full|proxy|off)
     touch "$TRANS_MARKER"
-    trap 'rm -f "$TRANS_MARKER"' EXIT INT TERM
     ;;
 esac
 case "$1" in
-  smart) bash ~/AI/singbox/dns-fix.sh apply || true; bash ~/AI/neodon-flatpak/firefox-proxy.sh restore || true; stop_all; fw_flush; set_mode smart; if systemctl --user start sing-box.service; then wd_reset; echo "VPN SMART ON"; notify "VPN SMART ON"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
+  smart) bash ~/AI/singbox/dns-fix.sh apply || true; bash ~/AI/neodon-flatpak/firefox-proxy.sh restore || true; stop_all; fw_flush; set_mode smart; if systemctl --user start sing-box.service; then wd_reset; echo "VPN SMART switching..."; notify "переключение на SMART…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
   full)
     bash ~/AI/neodon-flatpak/firefox-proxy.sh restore || true
     stop_all
@@ -68,7 +67,7 @@ case "$1" in
       exit 1
     fi
     wd_reset
-    EXIT=$(curl -s -m 8 https://api.ipify.org 2>/dev/null)
+    EXIT=$(curl -s -m 3 https://api.ipify.org 2>/dev/null)
     if [ -n "$EXIT" ] && [[ "$EXIT" != 79.139.* ]]; then
       echo "VPN FULL ON (READY) — exit $EXIT"
       notify "VPN FULL ON — exit $EXIT"
@@ -76,7 +75,7 @@ case "$1" in
       echo "FULL WARNING — exit не подтверждён, но firewall LOCKED (fail-closed). Run 'toggle off' to unlock."
     fi
     ;;
-  proxy) stop_all; fw_flush; set_mode proxy; bash ~/AI/singbox/dns-fix.sh apply || true; if systemctl --user start sing-box-proxy.service; then wd_reset; bash ~/AI/neodon-flatpak/firefox-proxy.sh apply || true; echo "VPN PROXY ON"; notify "VPN PROXY ON"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
+  proxy) stop_all; fw_flush; set_mode proxy; bash ~/AI/singbox/dns-fix.sh apply || true; if systemctl --user start sing-box-proxy.service; then wd_reset; bash ~/AI/neodon-flatpak/firefox-proxy.sh apply || true; echo "VPN PROXY switching..."; notify "переключение на PROXY…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
   off)
     bash ~/AI/neodon-flatpak/firefox-proxy.sh restore || true
     stop_all
@@ -105,8 +104,8 @@ status-json)
     if ip link show tun0 >/dev/null 2>&1; then tun_up=true; else tun_up=false; fi
     exit_ip=""
     case "$desired" in
-      full|smart) exit_ip=$(curl -s -m 3 https://api.ipify.org 2>/dev/null) ;;
-      proxy) exit_ip=$(curl -s -m 3 -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null) ;;
+      full|smart) if [ "$tun_up" = true ]; then exit_ip=$(curl -s -m 2 https://api.ipify.org 2>/dev/null); else exit_ip=""; fi ;;
+      proxy) if (echo > /dev/tcp/127.0.0.1/10808) 2>/dev/null; then exit_ip=$(curl -s -m 2 -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null); else exit_ip=""; fi ;;
     esac
     exit_ok=false
     if [ -n "$exit_ip" ]; then
@@ -134,9 +133,7 @@ status-json)
       [ -n "$svc_state" ] || svc_state=inactive
       substate=$(systemctl --user show -p SubState --value "$svc" 2>/dev/null)
       state=FAILED
-      if [ "$transitioning" = true ]; then
-        state=TRANSITIONING
-      elif [ "$svc_state" = "active" ] && [ "$exit_ok" = true ]; then
+      if [ "$svc_state" = "active" ] && [ "$exit_ok" = true ]; then
         state=CONNECTED
       else
         case "$svc_state" in
@@ -173,6 +170,11 @@ EOF
     elif { [ "$wd_status" = "degraded" ]; } && [ "$svc_state" = "active" ] && [ "$desired" != "off" ] && [ "$transitioning" != true ]; then
       state=DEGRADED
     fi
+    if [ "$transitioning" = true ] && [ "$state" != "CONNECTED" ] && [ "$state" != "OFF" ]; then
+      state=TRANSITIONING
+    else
+      rm -f "$TRANS_MARKER"
+    fi
     server_tag=$(python3 -c 'import json;print(json.load(open("/home/m26/AI/singbox/selected-server.json")).get("tag",""))' 2>/dev/null)
     lat=$(python3 - <<'EOF' 2>/dev/null
 import json, socket, time
@@ -182,7 +184,7 @@ try:
     if not p:
         raise SystemExit
     t0 = time.time()
-    socket.create_connection((p['server'], p['server_port']), timeout=2).close()
+    socket.create_connection((p['server'], p['server_port']), timeout=1).close()
     print(max(1, int((time.time() - t0) * 1000)))
 except Exception:
     print('null')
