@@ -14,7 +14,7 @@ export XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/us
 TS=$(date +%Y%m%d-%H%M%S)
 OUT=~/Videos/neodon-qa-${TAG}-${TS}.mp4
 timeout $SEC flatpak run --command=gpu-screen-recorder com.dec05eba.gpu_screen_recorder \
-  -w screen -c mp4 -f 30 -o "$OUT" >/dev/null 2>&1
+  -w screen -c mp4 -f 60 -o "$OUT" >/dev/null 2>&1
 [ -f "$OUT" ] || { echo "CAPTURE-FAIL (no file)"; exit 1; }
 DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT" 2>/dev/null)
 JANK=$(ffprobe -v error -select_streams v:0 -show_entries packet=pts_time -of csv=p=0 "$OUT" 2>/dev/null \
