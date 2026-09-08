@@ -623,6 +623,22 @@ def ensure_rules():
 # Главное окно
 # ---------------------------------------------------------------------------
 
+class _ElidedLabel(QLabel):
+    """Single-line label with … at any DPI (QLabel has no setElideMode)."""
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.setWordWrap(False)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+
+    def paintEvent(self, e):
+        from PySide6.QtGui import QPainter
+        p = QPainter(self)
+        el = self.fontMetrics().elidedText(
+            self.text(), Qt.TextElideMode.ElideRight, max(0, self.contentsRect().width()))
+        self.style().drawItemText(p, self.contentsRect(), self.alignment(),
+                                  self.palette(), True, el)
+
+
 class _ClickFrame(QFrame):
     """Кликабельный QFrame (карточка-кнопка): QLabel-контент рендерится,
     в отличие от QPushButton с layout (там дочерние QLabel пропадают).
@@ -1424,8 +1440,25 @@ class MainWindow(QMainWindow):
     def tick(self):
         try:
             if os.path.exists(ACTION_HOOK):
+                try:
+                    with open(ACTION_HOOK) as _f:
+                        hook = json.load(_f)
+                except (OSError, ValueError):
+                    hook = {}
                 os.remove(ACTION_HOOK)
-                self._tray_show()
+                if isinstance(hook, dict) and hook.get("action") == "navigate":
+                    self.navigate(hook.get("page") or "home")
+                elif isinstance(hook, dict) and hook.get("action") == "scroll":
+                    # QA backdoor: scroll current page without synthetic touch
+                    try:
+                        area = self.stack.currentWidget().findChild(QScrollArea)
+                        if area is not None:
+                            sb = area.verticalScrollBar()
+                            sb.setValue(sb.value() + int(hook.get("by") or 300))
+                    except (OSError, RuntimeError, ValueError, TypeError):
+                        pass
+                else:
+                    self._tray_show()
         except (OSError, RuntimeError):
             pass
         ep = getattr(self, "_epoch", None)
@@ -1606,15 +1639,19 @@ class MainWindow(QMainWindow):
                 fl.setStyleSheet("color:#33333D; font-size:14px;")
             fl.setFixedWidth(36)
             hl.addWidget(fl)
-            head = re.sub(r"^\[[A-Za-z]{2}\]\s*", "", strip_flags(remark).strip()) or ("Сервер %d" % (i + 1))
+            head = re.sub(r"^\[[A-Za-z0-9]{2,4}\]\s*", "", strip_flags(remark).strip()) or ("Сервер %d" % (i + 1))
             active = bool(self.active_addr) and s.get("address") == self.active_addr
             if active:
                 head += "  ●"
-            if len(head) > 24:
-                head = head[:23] + "…"
-            txt = QLabel("%s\n%s" % (head, server_desc(s)))
-            txt.setWordWrap(True)
-            hl.addWidget(txt, 1)
+            txv = QVBoxLayout()
+            txv.setContentsMargins(0, 0, 0, 0)
+            txv.setSpacing(0)
+            head_lbl = _ElidedLabel(head)
+            txv.addWidget(head_lbl)
+            desc_lbl = QLabel(server_desc(s))
+            desc_lbl.setObjectName("muted")
+            txv.addWidget(desc_lbl)
+            hl.addLayout(txv, 1)
             lat_lbl = QLabel()
             lat_lbl.setFixedWidth(64)
             lat_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)

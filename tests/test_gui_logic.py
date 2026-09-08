@@ -502,12 +502,15 @@ def test_tray_state_mirror(monkeypatch, tmp_path):
 def test_server_head_truncated(monkeypatch):
     m = app()
     win = _make_win(m, monkeypatch)
-    win.servers = [{"remarks": "[PL] very very long server name here yes",
+    win.servers = [{"remarks": "[RU2] YouTube без рекламы long tail here",
                     "address": "a.example", "port": 1}]
     win.lats = {}
     win.render_servers()
-    texts = [l.text() for l in win.findChildren(m.QLabel)]
-    assert any(not t.startswith("[PL] ") and "…" in t for t in texts), texts
+    heads = [l for l in win.findChildren(m._ElidedLabel)
+             if l.text().startswith("YouTube")]
+    assert heads, "stripped head present (no [RU2] prefix)"
+    assert all(h.wordWrap() is False for h in heads)
+    assert all("…" not in h.text() for h in heads), "elide owns overflow, not data"
 
 
 def test_ping_paints_in_place(monkeypatch):
@@ -538,6 +541,30 @@ def test_action_hook_shows_window(monkeypatch, tmp_path):
     assert not (tmp_path / "gui-action.json").exists()
     win.tick()
     assert calls == [1], "hook consumed once"
+
+
+def test_action_hook_navigate(monkeypatch, tmp_path):
+    import json as _json
+    m = app()
+    monkeypatch.setattr(m, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(m, "ACTION_HOOK", str(tmp_path / "gui-action.json"))
+    win = _make_win(m, monkeypatch)
+    (tmp_path / "gui-action.json").write_text(
+        _json.dumps({"action": "navigate", "page": "traffic"}))
+    win.tick()
+    assert win.stack.currentWidget() is win.pages["traffic"]
+
+
+def test_action_hook_scroll(monkeypatch, tmp_path):
+    import json as _json
+    m = app()
+    monkeypatch.setattr(m, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(m, "ACTION_HOOK", str(tmp_path / "gui-action.json"))
+    win = _make_win(m, monkeypatch)
+    (tmp_path / "gui-action.json").write_text(
+        _json.dumps({"action": "scroll", "by": 200}))
+    win.tick()
+    assert not (tmp_path / "gui-action.json").exists(), "hook consumed"
 
 
 def test_traffic_cards_render(monkeypatch, tmp_path):
