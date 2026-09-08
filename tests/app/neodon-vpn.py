@@ -82,7 +82,7 @@ PRESETS = [
      True, [], [], []),
     ("ru-bez-vpn", ".RU без VPN", "🇷🇺", "Отправляет весь RU трафик без ВПН", True,
      True, ["domain:avito.st", "geosite:category-ru", "regexp:.*\\.ru$", "regexp:.*\\.xn--p1ai$"], [], []),
-    ("russia-mimo", "Россия мимо VPN", "🛡️", "Весь трафик в VPN, кроме российских сайтов", False,
+    ("russia-mimo", "Россия мимо VPN", "🛡️", "Весь трафик в VPN, кроме российских сайтов", True,
      True, ["domain:avito.st", "geosite:category-ru", "geosite:private", "regexp:.*\\.ru$", "regexp:.*\\.xn--p1ai$"], [], []),
     ("ru-traffic-direct", ".ru трафик напрямую", "📄", "Пропускает русский трафик напрямую, минуя прокси", False,
      True, ["domain:avito.st", "domain:vk.com", "geosite:category-ru", "regexp:.*\\.ru$", "regexp:.*\\.su$"], [], []),
