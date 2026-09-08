@@ -410,6 +410,32 @@ def test_active_tag_visibility(monkeypatch):
     monkeypatch.setattr(m.QDialog, "exec", real_exec)
 
 
+def test_route_lookup(tmp_path):
+    import json as _json
+    m = app()
+    cfg = tmp_path / "cfg.json"
+    cfg.write_text(_json.dumps({"route": {
+        "rules": [{"domain_suffix": ["example.ru"], "outbound": "direct"}],
+        "final": "proxy"}}))
+    assert m.route_lookup("a.example.ru", str(cfg))[0] == "direct"
+    assert m.route_lookup("other.com", str(cfg))[0] == "proxy"
+    assert m.route_lookup("x.com", str(tmp_path / "nope.json"))[0] == "?"
+
+
+def test_dialog_canaries_live(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    opened = []
+    monkeypatch.setattr(m.QDialog, "exec", lambda self: opened.append(self) or 0)
+    monkeypatch.setattr(m, "route_lookup",
+                        lambda dom: {"ya.ru": ("direct", "suffix")}.get(dom, ("proxy", "final")))
+    win.active_profile = "ru-bez-vpn"
+    win.preset_details("ru-bez-vpn")
+    texts = [l.text() for l in opened[0].findChildren(m.QLabel)]
+    assert any("ya.ru → напрямую ✓" in t for t in texts), texts
+    assert any("youtube.com → VPN ✓" in t for t in texts), texts
+
+
 def test_traffic_cards_render(monkeypatch, tmp_path):
     m = app()
     win = _make_win(m, monkeypatch)

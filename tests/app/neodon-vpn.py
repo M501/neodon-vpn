@@ -143,6 +143,55 @@ def preset_icon(pid):
             return fp, emo
     return "", emo
 
+# Canaries: (domain, expected outbound) per preset. Shown live in the
+# preset dialog against the APPLIED config; encoded from matrix_canary.py.
+CANARIES = {
+    "default": [("ozon.ru", "direct"), ("youtube.com", "proxy")],
+    "ai": [("chatgpt.com", "proxy"), ("ya.ru", "direct")],
+    "anti-censorship": [("rutracker.org", "proxy"), ("ya.ru", "direct")],
+    "ru-bez-vpn": [("ya.ru", "direct"), ("youtube.com", "proxy"), ("rutracker.org", "proxy")],
+    "russia-mimo": [("ya.ru", "direct"), ("youtube.com", "proxy")],
+    "ru-traffic-direct": [("vk.com", "direct"), ("youtube.com", "proxy")],
+    "popular-ai": [("chatgpt.com", "proxy"), ("youtube.com", "direct")],
+    "social-networks": [("vk.com", "proxy"), ("ya.ru", "direct")],
+    "only-unavailable": [("youtube.com", "proxy"), ("ya.ru", "direct")],
+    "socseti-vpn": [("youtube.com", "proxy"), ("google.com", "proxy")],
+    "basic-set": [("instagram.com", "proxy"), ("ya.ru", "direct")],
+}
+
+_route_cache = {}
+
+def route_lookup(domain, cfg_path=None):
+    """Live lookup in the APPLIED sing-box config (what runs right now)."""
+    import re as _re
+    cfg_path = cfg_path or os.path.expanduser("~/AI/singbox/config.json")
+    try:
+        mt = os.path.getmtime(cfg_path)
+    except OSError:
+        return "?", "no-config"
+    c = _route_cache.get(cfg_path)
+    if c is None or mt != c["mtime"]:
+        try:
+            d = json.load(open(cfg_path))
+            c = {"rules": d["route"]["rules"],
+                 "final": d["route"].get("final", "proxy"), "mtime": mt}
+            _route_cache[cfg_path] = c
+        except (OSError, ValueError, KeyError):
+            return "?", "bad-config"
+    dom = (domain or "").lower().strip().rstrip(".")
+    for r in c["rules"]:
+        if "domain" in r and dom in (x.lower() for x in r["domain"]):
+            return r.get("outbound", "?"), "domain"
+        if "domain_suffix" in r and any(
+                dom == s.lower() or dom.endswith("." + s.lower())
+                for s in r["domain_suffix"]):
+            return r.get("outbound", "?"), "suffix"
+        if "domain_keyword" in r and any(k.lower() in dom for k in r["domain_keyword"]):
+            return r.get("outbound", "?"), "keyword"
+        if "domain_regex" in r and any(_re.compile(p).search(dom) for p in r["domain_regex"]):
+            return r.get("outbound", "?"), "regex"
+    return c["final"], "final"
+
 # ---------------------------------------------------------------------------
 # Иконки (SVG, в стиле v2RayTun: тонкие линии, текущий цвет)
 # ---------------------------------------------------------------------------
@@ -1017,6 +1066,26 @@ class MainWindow(QMainWindow):
         c.setObjectName("hint")
         c.setWordWrap(True)
         lay.addWidget(c)
+        if pid == self.active_profile:
+            live = []
+            for _dom, _exp in CANARIES.get(pid, []):
+                _got, _ = route_lookup(_dom)
+                _want = "VPN" if _exp == "proxy" else "напрямую"
+                if _got == _exp:
+                    live.append("%s → %s ✓" % (_dom, _want))
+                elif _got == "?":
+                    live.append("%s → %s …" % (_dom, _want))
+                else:
+                    live.append("%s → %s ✗ сейчас %s"
+                                % (_dom, _want, "VPN" if _got == "proxy" else "напрямую"))
+        else:
+            live = ["%s → %s (когда применишь)" % (_dom, "VPN" if _exp == "proxy" else "напрямую")
+                    for _dom, _exp in CANARIES.get(pid, [])]
+        if live:
+            lv = QLabel("\n".join(live))
+            lv.setObjectName("hint")
+            lv.setWordWrap(True)
+            lay.addWidget(lv)
         v = QLabel(("✓ проверено вживую" if verified else "○ ещё не проверялось")
                    + (" · АКТИВЕН" if pid == self.active_profile else ""))
         v.setObjectName("muted")
