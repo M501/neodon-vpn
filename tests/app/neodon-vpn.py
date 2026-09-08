@@ -80,10 +80,6 @@ FLAGS_DIR = os.path.join(APP_DIR, "flags")
 PRESETS = [
     ("default", "Default", "🌐", "RU/торренты/Steam/Ozon напрямую, остальное — через VPN", False,
      True, [], [], []),
-    ("ai", "AI (V1)", "🧠", "Сохранённый профиль V1: AI-сервисы через VPN", False,
-     True, [], [], []),
-    ("anti-censorship", "Анти-цензура (V1)", "🛰️", "Сохранённый профиль V1: anti-censorship", False,
-     True, [], [], []),
     ("ru-bez-vpn", ".RU без VPN", "🇷🇺", "Отправляет весь RU трафик без ВПН", True,
      True, ["domain:avito.st", "geosite:category-ru", "regexp:.*\\.ru$", "regexp:.*\\.xn--p1ai$"], [], []),
     ("russia-mimo", "Россия мимо VPN", "🛡️", "Весь трафик в VPN, кроме российских сайтов", False,
@@ -112,8 +108,7 @@ PRESETS = [
                  "geosite:cloudflare", "geosite:discord", "geosite:meta", "geosite:openai",
                  "geosite:telegram", "geosite:tiktok", "geosite:whatsapp", "geosite:youtube"], []),
 ]
-# Сохранённые профили V1 (остаются доступными):
-#   ai, anti-censorship — продолжают работать как были (файлы на хосте).
+# V1-наследие ai/anti-censorship удалено 2026-09-08 (spec 013): мусор не храним.
 
 def preset_summary(direct, proxy):
     """One-line rule census for a preset card: counts only, no claims."""
@@ -158,8 +153,6 @@ def card_pixmap(path, size=28):
 # preset dialog against the APPLIED config; encoded from matrix_canary.py.
 CANARIES = {
     "default": [("ozon.ru", "direct"), ("youtube.com", "proxy")],
-    "ai": [("chatgpt.com", "proxy"), ("ya.ru", "direct")],
-    "anti-censorship": [("rutracker.org", "proxy"), ("ya.ru", "direct")],
     "ru-bez-vpn": [("ya.ru", "direct"), ("youtube.com", "proxy"), ("rutracker.org", "proxy")],
     "russia-mimo": [("ya.ru", "direct"), ("youtube.com", "proxy")],
     "ru-traffic-direct": [("vk.com", "direct"), ("youtube.com", "proxy")],

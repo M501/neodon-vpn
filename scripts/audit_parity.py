@@ -4,7 +4,7 @@
 Runs ON HOST (data local). Checks:
  1. gen_full_profiles.PRESETS == WINDOWS_SPECS (verified dump 2026-09-07)
  2. profiles/*.json on disk == rebuilt from specs (multiset-equal rules)
- 3. legacy default/ai/anti-censorship sane (final, no rule_set refs)
+ 3. legacy default sane (final, no rule_set refs)
  4. provider RU-direct fully covered in ru-bez-vpn (via check_routes sim)
  5. no thin leftovers (entry thresholds), no rule_set refs anywhere
 Exit 0 = AUDIT-OK, 1 = diffs printed.
@@ -133,7 +133,7 @@ def main():
             print("2. %-16s disk==rebuilt OK rules=%d entries~%d" %
                   (pid, len(ds), entries(disk)))
     # 3. legacy sanity
-    for pid in ("default", "ai", "anti-censorship"):
+    for pid in ("default",):
         d = json.loads((PROF / (pid + ".json")).read_text(encoding="utf-8"))
         blob = json.dumps(d)
         ok = bool(d.get("final")) and "rule_set" not in blob

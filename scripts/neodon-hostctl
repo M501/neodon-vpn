@@ -33,7 +33,7 @@ case "${1:-}" in
     ;;
   profile)
     case "$2" in
-      default|ai|anti-censorship|ru-bez-vpn|russia-mimo|ru-traffic-direct|popular-ai|social-networks|only-unavailable|socseti-vpn|basic-set) exec python3 ~/AI/singbox/apply-profile.py "$2" ;;
+      default|ru-bez-vpn|russia-mimo|ru-traffic-direct|popular-ai|social-networks|only-unavailable|socseti-vpn|basic-set) exec python3 ~/AI/singbox/apply-profile.py "$2" ;;
       *) echo "neodon-hostctl: invalid profile '$2'" >&2; exit 2 ;;
     esac
     ;;
