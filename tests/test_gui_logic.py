@@ -478,6 +478,38 @@ def test_tray_flag_and_mode(monkeypatch):
     assert "TUNNEL" in calls["tip"], calls
 
 
+def test_tray_state_mirror(monkeypatch, tmp_path):
+    import json as _json
+    m = app()
+    monkeypatch.setattr(m, "STATE_DIR", str(tmp_path))
+    win = _make_win(m, monkeypatch)
+
+    class _T:
+        def setIcon(self, i):
+            pass
+
+        def setToolTip(self, t):
+            pass
+
+    win.tray = _T()
+    win.mode = "smart"
+    win.status = {"server_tag": "[PL] NEODON VPN x"}
+    win._sync_tray("CONNECTED")
+    d = _json.loads((tmp_path / "tray-state.json").read_text())
+    assert d["state"] == "CONNECTED" and "PROXY" in d["tooltip"], d
+
+
+def test_server_head_truncated(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.servers = [{"remarks": "[PL] very very long server name here yes",
+                    "address": "a.example", "port": 1}]
+    win.lats = {}
+    win.render_servers()
+    texts = [l.text() for l in win.findChildren(m.QLabel)]
+    assert any(not t.startswith("[PL] ") and "…" in t for t in texts), texts
+
+
 def test_ping_paints_in_place(monkeypatch):
     m = app()
     win = _make_win(m, monkeypatch)

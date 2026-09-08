@@ -1399,17 +1399,25 @@ class MainWindow(QMainWindow):
             mode = self.MODE_LABELS.get(getattr(self, "mode", ""), "") or ""
             me = (" · " + mode) if mode and s == "CONNECTED" else ""
             tray.setToolTip("Neodon VPN — %s%s%s" % (human, me, srv))
+            icon_kind = "theme"
             if s == "CONNECTED":
                 # flag of the active server instead of a generic dot
                 fpix = flag_pixmap(flag_code(tag), 22, 15) if tag else None
                 if fpix is not None and not fpix.isNull():
                     tray.setIcon(QIcon(fpix))
-                    return
-            names = {"CONNECTED": "network-vpn-connected",
-                     "LOCKED": "network-vpn-acquiring",
-                     "FAILED": "network-error"}
-            if s in names and QIcon.hasThemeIcon(names[s]):
-                tray.setIcon(QIcon.fromTheme(names[s]))
+                    icon_kind = "flag"
+            if icon_kind == "theme":
+                names = {"CONNECTED": "network-vpn-connected",
+                         "LOCKED": "network-vpn-acquiring",
+                         "FAILED": "network-error"}
+                if s in names and QIcon.hasThemeIcon(names[s]):
+                    tray.setIcon(QIcon.fromTheme(names[s]))
+            try:
+                with open(os.path.join(STATE_DIR, "tray-state.json"), "w") as _f:
+                    _f.write(json.dumps({"state": s, "tooltip": "Neodon VPN — %s%s%s" % (human, me, srv),
+                                         "icon": icon_kind, "ts": int(time.time())}))
+            except OSError:
+                pass
         except Exception:
             pass
 
@@ -1512,6 +1520,10 @@ class MainWindow(QMainWindow):
             # shows the old mode during teardown, flipping buttons back
             self.set_mode(self.desired if self.desired in ("smart", "full") else "smart")
         self.render_status()
+        try:
+            self._sync_tray(_new)
+        except RuntimeError:
+            pass
         self.write_gui_state()
 
     def _status_failed(self, _err):
@@ -1598,6 +1610,8 @@ class MainWindow(QMainWindow):
             active = bool(self.active_addr) and s.get("address") == self.active_addr
             if active:
                 head += "  ●"
+            if len(head) > 24:
+                head = head[:23] + "…"
             txt = QLabel("%s\n%s" % (head, server_desc(s)))
             txt.setWordWrap(True)
             hl.addWidget(txt, 1)
