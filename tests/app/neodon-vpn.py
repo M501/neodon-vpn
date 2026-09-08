@@ -128,6 +128,21 @@ def preset_summary(direct, proxy):
         parts.append("категории: " + ", ".join(gs[:6]) + ("…" if len(gs) > 6 else ""))
     return " · ".join(parts) if parts else "без доп. записей"
 
+ICONS_DIR = os.path.join(APP_DIR, "icons")
+
+def preset_icon(pid):
+    """v2RayTun icon file -> emoji -> letter. Returns (path, fallback)."""
+    emo = "?"
+    for p in PRESETS:
+        if p[0] == pid:
+            emo = p[2]
+            break
+    for ext in ("jpg", "png"):
+        fp = os.path.join(ICONS_DIR, "%s.%s" % (pid, ext))
+        if os.path.exists(fp):
+            return fp, emo
+    return "", emo
+
 # ---------------------------------------------------------------------------
 # Иконки (SVG, в стиле v2RayTun: тонкие линии, текущий цвет)
 # ---------------------------------------------------------------------------
@@ -221,7 +236,9 @@ QPushButton:disabled { color: #6B6B76; background: #1A1A20; }
 #rowBtn:hover { background: #1F1F26; }
 #rowCard { background: #17171C; border: 1px solid #26262E; border-radius: 12px; }
 #rowCard:hover { background: #1F1F26; border-color: #33333D; }
+#rowCardActive { background: #17171C; border: 2px solid #3373F7; border-radius: 12px; }
 #badge { background: #1F1F26; border: 1px solid #33333D; border-radius: 14px; color: #3373F7; font-size: 13px; font-weight: 700; }
+#activeTag { color: #4ADE80; font-weight: 700; font-size: 12px; }
 QProgressBar { background: #1F1F26; border: none; border-radius: 5px; min-height: 10px; max-height: 10px; text-align: center; color: transparent; }
 QProgressBar::chunk { background: #3373F7; border-radius: 5px; }
 QListWidget { background: transparent; border: none; outline: 0; }
@@ -622,6 +639,7 @@ class MainWindow(QMainWindow):
         self._last_desired = None
         self._settle_until = 0
         self._pending = None
+        self._last_preset = None
         self.connected = False
         self.mode = "smart"          # пользовательский: smart (PROXY) | full (TUNNEL)
         self.status = {}
@@ -895,13 +913,28 @@ class MainWindow(QMainWindow):
         w, bl = self._page("Traffic rules")
         self.stack.addWidget(w)
         self.pages["traffic"] = w
-        desc = QLabel("Пресеты правил сообщества (перенесены из v2RayTun). Клик — применить; активный отмечен галочкой. Режим TUNNEL игнорирует правила.")
+        desc = QLabel("Пресет правил под свои нужды. Тап — применить; активный подсвечен. Режим TUNNEL игнорирует правила.")
         desc.setObjectName("muted")
         desc.setWordWrap(True)
         bl.addWidget(desc)
+        use_row = QFrame()
+        use_row.setObjectName("rowCard")
+        uh = QHBoxLayout(use_row)
+        uh.setContentsMargins(12, 10, 12, 10)
+        ul = QLabel("Use preset")
+        ul.setObjectName("h2")
+        uh.addWidget(ul)
+        uh.addStretch(1)
+        self.use_preset_cb = QCheckBox()
+        self.use_preset_cb.setToolTip("Выкл — базовый набор Default")
+        self.use_preset_cb.toggled.connect(self.on_use_preset)
+        uh.addWidget(self.use_preset_cb)
+        bl.addWidget(use_row)
+        info = QLabel("Community rules — готовые правила от сообщества под разные нужды.")
+        info.setObjectName("muted")
+        info.setWordWrap(True)
+        bl.addWidget(info)
         self.preset_btns = {}
-        self.preset_group = QButtonGroup(self)
-        self.preset_group.setExclusive(True)
         for pid, name, icon, descr, verified, gproxy, direct, proxy, block in PRESETS:
             b = _ClickFrame(lambda p=pid: self.select_preset(p))
             b.setObjectName("rowCard")
@@ -909,15 +942,29 @@ class MainWindow(QMainWindow):
             hl = QHBoxLayout(b)
             hl.setContentsMargins(12, 10, 12, 10)
             hl.setSpacing(10)
-            ic = QLabel((name or "?")[0].upper())
-            ic.setObjectName("badge")
+            ipath, ifallback = preset_icon(pid)
+            if ipath:
+                ic = QLabel()
+                ic.setPixmap(QPixmap(ipath).scaled(28, 28, Qt.AspectRatioMode.KeepAspectRatio,
+                                                   Qt.TransformationMode.SmoothTransformation))
+            else:
+                ic = QLabel(ifallback or icon or "•")
+                ic.setStyleSheet("font-size: 18px;")
             ic.setFixedSize(28, 28)
             ic.setAlignment(Qt.AlignmentFlag.AlignCenter)
             hl.addWidget(ic)
             v = QVBoxLayout()
+            nh = QHBoxLayout()
             nm = QLabel(name)
             nm.setObjectName("h2")
-            v.addWidget(nm)
+            nh.addWidget(nm)
+            if verified:
+                dot = QLabel("●")
+                dot.setStyleSheet("color: #3373F7; font-size: 12px;")
+                dot.setToolTip("Проверено вживую")
+                nh.addWidget(dot)
+            nh.addStretch(1)
+            v.addLayout(nh)
             ds = QLabel(descr)
             ds.setObjectName("muted")
             ds.setWordWrap(True)
@@ -925,25 +972,65 @@ class MainWindow(QMainWindow):
             ft = QLabel("остальное — через VPN" if gproxy else "остальное — напрямую")
             ft.setObjectName("hint")
             v.addWidget(ft)
-            vd = QLabel("✓ проверено вживую" if verified else "○ ещё не проверялось")
-            vd.setObjectName("muted")
-            vd.setStyleSheet("color: %s; font-size: 11px;" % ("#4ADE80" if verified else "#666"))
-            v.addWidget(vd)
-            sm = QLabel(preset_summary(direct, proxy))
-            sm.setObjectName("hint")
-            sm.setWordWrap(True)
-            v.addWidget(sm)
             hl.addLayout(v, 1)
+            info_btn = QPushButton(">")
+            info_btn.setFixedSize(30, 30)
+            info_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            info_btn.clicked.connect(lambda _=False, p=pid: self.preset_details(p))
+            hl.addWidget(info_btn)
             rb = QLabel()
             rb.setFixedSize(18, 18)
             hl.addWidget(rb)
             self.preset_btns[pid] = (b, rb)
             bl.addWidget(b)
-        self.preset_desc = QLabel("")
-        self.preset_desc.setObjectName("muted")
-        self.preset_desc.setWordWrap(True)
-        bl.addWidget(self.preset_desc)
         bl.addStretch()
+
+    def on_use_preset(self, checked):
+        if not checked:
+            if self.active_profile != "default":
+                self._last_preset = self.active_profile
+                self.select_preset("default")
+        else:
+            target = getattr(self, "_last_preset", None) or "default"
+            if target != self.active_profile:
+                self.select_preset(target)
+
+    def preset_details(self, pid):
+        meta = next((p for p in PRESETS if p[0] == pid), None)
+        if meta is None:
+            return
+        _, name, icon, descr, verified, gproxy, direct, proxy, _block = meta
+        dlg = QDialog(self)
+        dlg.setWindowTitle(name)
+        lay = QVBoxLayout(dlg)
+        t = QLabel("%s %s" % (icon, name))
+        t.setObjectName("h2")
+        lay.addWidget(t)
+        d = QLabel(descr)
+        d.setObjectName("muted")
+        d.setWordWrap(True)
+        lay.addWidget(d)
+        f = QLabel("остальное — " + ("через VPN" if gproxy else "напрямую"))
+        f.setObjectName("hint")
+        lay.addWidget(f)
+        c = QLabel(preset_summary(direct, proxy))
+        c.setObjectName("hint")
+        c.setWordWrap(True)
+        lay.addWidget(c)
+        v = QLabel(("✓ проверено вживую" if verified else "○ ещё не проверялось")
+                   + (" · АКТИВЕН" if pid == self.active_profile else ""))
+        v.setObjectName("muted")
+        lay.addWidget(v)
+        row = QHBoxLayout()
+        if pid != self.active_profile:
+            ap = QPushButton("Применить")
+            ap.clicked.connect(lambda: (self.select_preset(pid), dlg.accept()))
+            row.addWidget(ap)
+        cl = QPushButton("Закрыть")
+        cl.clicked.connect(dlg.accept)
+        row.addWidget(cl)
+        lay.addLayout(row)
+        dlg.exec()
 
     def select_preset(self, pid):
         cur = self.active_profile
@@ -965,6 +1052,15 @@ class MainWindow(QMainWindow):
             checked = pid == self.active_profile
             rb.setPixmap(icon_pixmap("check" if checked else "dots", 16,
                                      "#4ADE80" if checked else "#33333D"))
+            _b.setObjectName("rowCardActive" if checked else "rowCard")
+            _b.style().unpolish(_b)
+            _b.style().polish(_b)
+        if getattr(self, "use_preset_cb", None) is not None:
+            try:
+                self.use_preset_cb.blockSignals(True)
+                self.use_preset_cb.setChecked(self.active_profile != "default")
+            finally:
+                self.use_preset_cb.blockSignals(False)
 
     # ---- Settings ----
     def _build_settings(self):

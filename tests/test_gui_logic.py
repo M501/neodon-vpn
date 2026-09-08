@@ -344,12 +344,70 @@ def test_pending_last_wins(monkeypatch):
     assert win._pending == ("toggle", ("smart",)), win._pending
 
 
+def test_use_preset_toggle_routes(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    calls = []
+
+    def _sel(pid):
+        calls.append(pid)
+        win.active_profile = pid
+
+    win.select_preset = _sel
+    win.active_profile = "ru-bez-vpn"
+    win.on_use_preset(False)
+    assert calls == ["default"]
+    assert win._last_preset == "ru-bez-vpn"
+    win.on_use_preset(True)
+    assert calls == ["default", "ru-bez-vpn"]
+
+
+def test_active_preset_highlighted(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.active_profile = "ru-bez-vpn"
+    win.render_presets()
+    b, _rb = win.preset_btns["ru-bez-vpn"]
+    assert b.objectName() == "rowCardActive"
+    for pid, (_bb, _r) in win.preset_btns.items():
+        if pid != "ru-bez-vpn":
+            assert _bb.objectName() == "rowCard"
+    assert win.use_preset_cb.isChecked()
+    win.active_profile = "default"
+    win.render_presets()
+    assert not win.use_preset_cb.isChecked()
+
+
 def test_preset_summary_counts():
     m = app()
     s = m.preset_summary(["geosite:category-ru", "domain:avito.st"], ["geosite:youtube"])
     assert "2 зап." in s and "1 зап." in s
     assert "category-ru" in s and "youtube" in s
     assert m.preset_summary([], []) == "без доп. записей"
+
+
+def test_preset_icon_fallback():
+    m = app()
+    fp, fb = m.preset_icon("ru-bez-vpn")
+    assert fb == "🇷🇺"
+    assert fp == "" or fp.endswith(("ru-bez-vpn.jpg", "ru-bez-vpn.png"))
+    assert m.preset_icon("nope") == ("", "?")
+
+
+def test_active_tag_visibility(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    opened = []
+    real_exec = m.QDialog.exec
+    monkeypatch.setattr(m.QDialog, "exec", lambda self: opened.append(self) or 0)
+    win.active_profile = "ru-bez-vpn"
+    win.preset_details("ru-bez-vpn")
+    assert len(opened) == 1
+    texts = [l.text() for l in opened[0].findChildren(m.QLabel)]
+    assert any("category-ru" in t for t in texts), texts
+    assert any("АКТИВЕН" in t for t in texts), texts
+    assert any("проверено вживую" in t for t in texts), texts
+    monkeypatch.setattr(m.QDialog, "exec", real_exec)
 
 
 def test_traffic_cards_render(monkeypatch, tmp_path):
