@@ -78,7 +78,7 @@ FLAGS_DIR = os.path.join(APP_DIR, "flags")
 # Правила Neodon-базовые (private/ozon/bittorrent/process) добавляются всегда.
 # ---------------------------------------------------------------------------
 PRESETS = [
-    ("default", "Default", "🌐", "RU/торренты/Steam/Ozon напрямую, остальное — через VPN", True,
+    ("default", "Default", "🌐", "RU/торренты/Steam/Ozon напрямую, остальное — через VPN", False,
      True, [], [], []),
     ("ai", "AI (V1)", "🧠", "Сохранённый профиль V1: AI-сервисы через VPN", False,
      True, [], [], []),
@@ -92,7 +92,7 @@ PRESETS = [
      True, ["domain:avito.st", "domain:vk.com", "geosite:category-ru", "regexp:.*\\.ru$", "regexp:.*\\.su$"], [], []),
     ("popular-ai", "Popular AI", "🤖", "Популярные нейросети через VPN, остальной трафик мимо VPN", True,
      False, [], ["geosite:category-ai-!cn", "geosite:category-ai-cn"], []),
-    ("social-networks", "Social Networks", "💬", "Популярные соцсети через VPN, остальной трафик напрямую", True,
+    ("social-networks", "Social Networks", "💬", "Популярные соцсети через VPN, остальной трафик напрямую", False,
      False, [], ["geosite:discord", "geosite:github", "geosite:google", "geosite:meta", "geosite:openai",
                  "geosite:spotify", "geosite:telegram", "geosite:tiktok", "geosite:vk", "geosite:whatsapp"], []),
     ("only-unavailable", "Только недоступные ресурсы", "🚫", "Через VPN только большинство недоступных в РФ ресурсов", False,
@@ -142,6 +142,17 @@ def preset_icon(pid):
         if os.path.exists(fp):
             return fp, emo
     return "", emo
+
+def card_pixmap(path, size=28):
+    """Square crop-fill for photo icons with padding (v2RayTun black bars)."""
+    pm = QPixmap(path)
+    if pm.isNull():
+        return None
+    w, h = pm.width(), pm.height()
+    s = min(w, h)
+    pm = pm.copy((w - s) // 2, (h - s) // 2, s, s)
+    return pm.scaled(size, size, Qt.AspectRatioMode.IgnoreAspectRatio,
+                     Qt.TransformationMode.SmoothTransformation)
 
 # Canaries: (domain, expected outbound) per preset. Shown live in the
 # preset dialog against the APPLIED config; encoded from matrix_canary.py.
@@ -992,13 +1003,13 @@ class MainWindow(QMainWindow):
             hl.setContentsMargins(12, 10, 12, 10)
             hl.setSpacing(10)
             ipath, ifallback = preset_icon(pid)
-            if ipath:
-                ic = QLabel()
-                ic.setPixmap(QPixmap(ipath).scaled(28, 28, Qt.AspectRatioMode.KeepAspectRatio,
-                                                   Qt.TransformationMode.SmoothTransformation))
-            else:
+            px = card_pixmap(ipath) if ipath else None
+            if px is None:
                 ic = QLabel(ifallback or icon or "•")
                 ic.setStyleSheet("font-size: 18px;")
+            else:
+                ic = QLabel()
+                ic.setPixmap(px)
             ic.setFixedSize(28, 28)
             ic.setAlignment(Qt.AlignmentFlag.AlignCenter)
             hl.addWidget(ic)
@@ -1021,6 +1032,10 @@ class MainWindow(QMainWindow):
             ft = QLabel("остальное — через VPN" if gproxy else "остальное — напрямую")
             ft.setObjectName("hint")
             v.addWidget(ft)
+            act = QLabel("● АКТИВЕН")
+            act.setObjectName("activeTag")
+            act.setVisible(False)
+            v.addWidget(act)
             hl.addLayout(v, 1)
             info_btn = QPushButton(">")
             info_btn.setFixedSize(30, 30)
@@ -1030,7 +1045,7 @@ class MainWindow(QMainWindow):
             rb = QLabel()
             rb.setFixedSize(18, 18)
             hl.addWidget(rb)
-            self.preset_btns[pid] = (b, rb)
+            self.preset_btns[pid] = (b, rb, act)
             bl.addWidget(b)
         bl.addStretch()
 
@@ -1117,10 +1132,11 @@ class MainWindow(QMainWindow):
         self.poll_status()
 
     def render_presets(self):
-        for pid, (_b, rb) in self.preset_btns.items():
+        for pid, (_b, rb, act) in self.preset_btns.items():
             checked = pid == self.active_profile
             rb.setPixmap(icon_pixmap("check" if checked else "dots", 16,
                                      "#4ADE80" if checked else "#33333D"))
+            act.setVisible(checked)
             _b.setObjectName("rowCardActive" if checked else "rowCard")
             _b.style().unpolish(_b)
             _b.style().polish(_b)

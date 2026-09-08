@@ -367,9 +367,9 @@ def test_active_preset_highlighted(monkeypatch):
     win = _make_win(m, monkeypatch)
     win.active_profile = "ru-bez-vpn"
     win.render_presets()
-    b, _rb = win.preset_btns["ru-bez-vpn"]
+    b, _rb, _act = win.preset_btns["ru-bez-vpn"]
     assert b.objectName() == "rowCardActive"
-    for pid, (_bb, _r) in win.preset_btns.items():
+    for pid, (_bb, _r, _a) in win.preset_btns.items():
         if pid != "ru-bez-vpn":
             assert _bb.objectName() == "rowCard"
     assert win.use_preset_cb.isChecked()
@@ -434,6 +434,20 @@ def test_dialog_canaries_live(monkeypatch):
     texts = [l.text() for l in opened[0].findChildren(m.QLabel)]
     assert any("ya.ru → напрямую ✓" in t for t in texts), texts
     assert any("youtube.com → VPN ✓" in t for t in texts), texts
+
+
+def test_card_active_tag(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.active_profile = "ru-bez-vpn"
+    win.render_presets()
+    assert win.preset_btns["ru-bez-vpn"][2].isHidden() is False
+    assert win.preset_btns["default"][2].isHidden() is True
+
+
+def test_card_pixmap_missing():
+    m = app()
+    assert m.card_pixmap("/nonexistent/x.png") is None
 
 
 def test_traffic_cards_render(monkeypatch, tmp_path):
