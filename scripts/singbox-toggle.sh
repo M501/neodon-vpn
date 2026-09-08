@@ -106,8 +106,8 @@ status-json)
     em=2; [ -f "$TRANS_MARKER" ] && em=5
     exit_ip=""
     case "$desired" in
-      full|smart) if [ "$tun_up" = true ]; then exit_ip=$(curl -s -m $em https://api.ipify.org 2>/dev/null); else exit_ip=""; fi ;;
-      proxy) if (echo > /dev/tcp/127.0.0.1/10808) 2>/dev/null; then exit_ip=$(curl -s -m $em -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null); else exit_ip=""; fi ;;
+      full|smart) if [ "$tun_up" = true ]; then exit_ip=$(curl -s -m $em https://api.ipify.org 2>/dev/null || curl -s -m $em https://api.ipify.org 2>/dev/null); else exit_ip=""; fi ;;
+      proxy) if (echo > /dev/tcp/127.0.0.1/10808) 2>/dev/null; then exit_ip=$(curl -s -m $em -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null || curl -s -m $em -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null); else exit_ip=""; fi ;;
     esac
     exit_ok=false
     if [ -n "$exit_ip" ]; then

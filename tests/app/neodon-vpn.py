@@ -1396,7 +1396,15 @@ class MainWindow(QMainWindow):
             human = {"CONNECTED": "ON", "TRANSITIONING": "переход…",
                      "STARTING": "переход…", "CONNECTING": "переход…",
                      "STOPPING": "переход…"}.get(s, s)
-            tray.setToolTip("Neodon VPN — %s%s" % (human, srv))
+            mode = self.MODE_LABELS.get(getattr(self, "mode", ""), "") or ""
+            me = (" · " + mode) if mode and s == "CONNECTED" else ""
+            tray.setToolTip("Neodon VPN — %s%s%s" % (human, me, srv))
+            if s == "CONNECTED":
+                # flag of the active server instead of a generic dot
+                fpix = flag_pixmap(flag_code(tag), 22, 15) if tag else None
+                if fpix is not None and not fpix.isNull():
+                    tray.setIcon(QIcon(fpix))
+                    return
             names = {"CONNECTED": "network-vpn-connected",
                      "LOCKED": "network-vpn-acquiring",
                      "FAILED": "network-error"}
@@ -1406,6 +1414,12 @@ class MainWindow(QMainWindow):
             pass
 
     def tick(self):
+        try:
+            if os.path.exists(ACTION_HOOK):
+                os.remove(ACTION_HOOK)
+                self._tray_show()
+        except (OSError, RuntimeError):
+            pass
         ep = getattr(self, "_epoch", None)
         if ep:
             s = max(0, int(time.monotonic() - ep))
@@ -1556,6 +1570,7 @@ class MainWindow(QMainWindow):
 
     def render_servers(self):
         # clear grid
+        self._srv_lat = {}
         while self.srv_grid.count():
             child = self.srv_grid.takeAt(0)
             if child.widget():
@@ -1564,14 +1579,6 @@ class MainWindow(QMainWindow):
         for i, s in enumerate(self.servers):
             remark = s.get("remarks") or s.get("address") or ("Сервер %d" % (i + 1))
             code = flag_code(remark)
-            ms = self.lats.get(i)
-            if ms is not None and ms >= 0:
-                color = "#4ADE80" if ms < 120 else ("#F5A623" if ms < 300 else "#E5484D")
-                lat = '<span style="color:%s">%d мс</span>' % (color, ms)
-            elif ms == -1:
-                lat = '<span style="color:#E5484D">✗</span>'
-            else:
-                lat = "—"
             row = _ClickFrame(lambda e=None, p=i: self._select_server_idx(p))
             row.setObjectName("serverCard")
             row.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1591,9 +1598,15 @@ class MainWindow(QMainWindow):
             active = bool(self.active_addr) and s.get("address") == self.active_addr
             if active:
                 head += "  ●"
-            txt = QLabel("%s\n%s · %s" % (head, server_desc(s), lat))
+            txt = QLabel("%s\n%s" % (head, server_desc(s)))
             txt.setWordWrap(True)
             hl.addWidget(txt, 1)
+            lat_lbl = QLabel()
+            lat_lbl.setFixedWidth(64)
+            lat_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            hl.addWidget(lat_lbl)
+            self._srv_lat[i] = lat_lbl
+            self._paint_lat(i)
             r = i // COLS
             c = i % COLS
             self.srv_grid.addWidget(row, r, c)
@@ -1602,17 +1615,34 @@ class MainWindow(QMainWindow):
             else:
                 row.setStyleSheet("QFrame#serverCard { background:#1C1C22; border:1px solid #26262E; border-radius:10px; }")
 
+    def _paint_lat(self, i):
+        lbl = getattr(self, "_srv_lat", {}).get(i)
+        if lbl is None:
+            return
+        ms = self.lats.get(i)
+        if ms is not None and ms >= 0:
+            color = "#4ADE80" if ms < 120 else ("#F5A623" if ms < 300 else "#E5484D")
+            lbl.setText('<span style="color:%s">%d мс</span>' % (color, ms))
+        elif ms == -1:
+            lbl.setText('<span style="color:#E5484D">✗</span>')
+        else:
+            lbl.setText("—")
+
+    def _on_ping_result(self, i, ms):
+        self.lats[i] = ms
+        self._paint_lat(i)
+
     def start_ping(self):
         if not self.servers:
             return
         w = PingWorker(self.servers)
-        w.result.connect(lambda i, ms: self.lats.__setitem__(i, ms))
+        w.result.connect(self._on_ping_result)
         w.done.connect(self._ping_done)
         w.start()
         self._workers.append(w)
 
     def _ping_done(self):
-        self.render_servers()
+        pass  # painted in place already; rebuild would flicker
 
     def _select_server_idx(self, idx):
         if not (0 <= idx < len(self.servers)):
@@ -1972,8 +2002,13 @@ def main():
         try:
             fcntl.flock(_LOCK_FD, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
-            # Второй экземпляр: молча выходим (окно уже открыто).
+            # Второй экземпляр: просим показать окно через хук и выходим.
             print("Neodon VPN already running", file=sys.stderr)
+            try:
+                with open(ACTION_HOOK, "w") as _f:
+                    _f.write(json.dumps({"action": "show", "ts": int(time.time())}))
+            except OSError:
+                pass
             return 0
     except ImportError:
         # Fallback без fcntl (не Linux): файл-маркер с проверкой живого PID.

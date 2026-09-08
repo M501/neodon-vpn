@@ -450,6 +450,64 @@ def test_card_pixmap_missing():
     assert m.card_pixmap("/nonexistent/x.png") is None
 
 
+def test_flag_code_brackets():
+    m = app()
+    assert m.flag_code("[PL] NEODON VPN x") == "PL"
+    assert m.flag_code("no code here") is None
+
+
+def test_tray_flag_and_mode(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    calls = {}
+
+    class _T:
+        def setIcon(self, i):
+            calls["icon"] = i
+
+        def setToolTip(self, t):
+            calls["tip"] = t
+
+    win.tray = _T()
+    win.mode = "smart"
+    win.status = {"server_tag": "[PL] NEODON VPN x", "exit_ip": "1.1.1.1"}
+    win._sync_tray("CONNECTED")
+    assert "PROXY" in calls["tip"] and "NEODON" in calls["tip"], calls
+    win.mode = "full"
+    win._sync_tray("CONNECTED")
+    assert "TUNNEL" in calls["tip"], calls
+
+
+def test_ping_paints_in_place(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.servers = [{"remarks": "[PL] t", "address": "a.example", "port": 1},
+                   {"remarks": "[DE] t", "address": "b.example", "port": 1}]
+    win.lats = {}
+    win.render_servers()
+    n = win.srv_grid.count()
+    assert n == 2
+    win._on_ping_result(0, 42)
+    assert "42" in win._srv_lat[0].text()
+    assert win.srv_grid.count() == n, "no rebuild on ping result"
+
+
+def test_action_hook_shows_window(monkeypatch, tmp_path):
+    import json as _json
+    m = app()
+    monkeypatch.setattr(m, "STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(m, "ACTION_HOOK", str(tmp_path / "gui-action.json"))
+    win = _make_win(m, monkeypatch)
+    calls = []
+    win._tray_show = lambda: calls.append(1)
+    (tmp_path / "gui-action.json").write_text(_json.dumps({"action": "show"}))
+    win.tick()
+    assert calls == [1]
+    assert not (tmp_path / "gui-action.json").exists()
+    win.tick()
+    assert calls == [1], "hook consumed once"
+
+
 def test_traffic_cards_render(monkeypatch, tmp_path):
     m = app()
     win = _make_win(m, monkeypatch)
