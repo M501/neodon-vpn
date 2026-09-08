@@ -9,8 +9,8 @@ import re
 
 PROF = os.path.expanduser("~/AI/singbox/profiles")
 FINALS = {"default": "proxy", "ai": "proxy", "anti-censorship": "proxy",
-          "ru-bez-vpn": "proxy", "russia-mimo": "proxy",
-          "ru-traffic-direct": "proxy", "popular-ai": "direct",
+          "ru-bez-vpn": "proxy",
+          "popular-ai": "direct",
           "social-networks": "direct", "only-unavailable": "direct",
           "socseti-vpn": "direct", "basic-set": "direct"}
 DOMS = ["ya.ru", "youtube.com", "rutracker.org", "vk.com", "chatgpt.com",

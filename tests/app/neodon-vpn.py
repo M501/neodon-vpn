@@ -82,10 +82,7 @@ PRESETS = [
      True, [], [], []),
     ("ru-bez-vpn", ".RU без VPN", "🇷🇺", "Отправляет весь RU трафик без ВПН", True,
      True, ["domain:avito.st", "geosite:category-ru", "regexp:.*\\.ru$", "regexp:.*\\.xn--p1ai$"], [], []),
-    ("russia-mimo", "Россия мимо VPN", "🛡️", "Весь трафик в VPN, кроме российских сайтов", True,
-     True, ["domain:avito.st", "geosite:category-ru", "geosite:private", "regexp:.*\\.ru$", "regexp:.*\\.xn--p1ai$"], [], []),
-    ("ru-traffic-direct", ".ru трафик напрямую", "📄", "Пропускает русский трафик напрямую, минуя прокси", False,
-     True, ["domain:avito.st", "domain:vk.com", "geosite:category-ru", "regexp:.*\\.ru$", "regexp:.*\\.su$"], [], []),
+
     ("popular-ai", "Popular AI", "🤖", "Популярные нейросети через VPN, остальной трафик мимо VPN", True,
      False, [], ["geosite:category-ai-!cn", "geosite:category-ai-cn"], []),
     ("social-networks", "Social Networks", "💬", "Популярные соцсети через VPN, остальной трафик напрямую", False,
@@ -154,8 +151,6 @@ def card_pixmap(path, size=28):
 CANARIES = {
     "default": [("ozon.ru", "direct"), ("youtube.com", "proxy")],
     "ru-bez-vpn": [("ya.ru", "direct"), ("youtube.com", "proxy"), ("rutracker.org", "proxy")],
-    "russia-mimo": [("ya.ru", "direct"), ("youtube.com", "proxy")],
-    "ru-traffic-direct": [("vk.com", "direct"), ("youtube.com", "proxy")],
     "popular-ai": [("chatgpt.com", "proxy"), ("youtube.com", "direct")],
     "social-networks": [("vk.com", "proxy"), ("ya.ru", "direct")],
     "only-unavailable": [("youtube.com", "proxy"), ("ya.ru", "direct")],

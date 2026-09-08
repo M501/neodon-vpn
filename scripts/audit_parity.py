@@ -25,14 +25,6 @@ WINDOWS_SPECS = {
     "ru-bez-vpn": (True,
                    ["domain:avito.st", "geosite:category-ru",
                     r"regexp:.*\.ru$", r"regexp:.*\.xn--p1ai$"], []),
-    "russia-mimo": (True,
-                    ["domain:avito.st", "geosite:category-ru",
-                     "geosite:private", r"regexp:.*\.ru$",
-                     r"regexp:.*\.xn--p1ai$"], []),
-    "ru-traffic-direct": (True,
-                          ["domain:avito.st", "domain:vk.com",
-                           "geosite:category-ru", r"regexp:.*\.ru$",
-                           r"regexp:.*\.su$"], []),
     "popular-ai": (False, [],
                    ["geosite:category-ai-!cn", "geosite:category-ai-cn"]),
     "social-networks": (False, [],
@@ -70,8 +62,7 @@ WINDOWS_SPECS = {
                    "geosite:whatsapp", "geosite:youtube"]),
 }
 
-MIN_ENTRIES = {"ru-bez-vpn": 1000, "russia-mimo": 1000,
-               "ru-traffic-direct": 1000, "popular-ai": 200,
+MIN_ENTRIES = {"ru-bez-vpn": 1000, "popular-ai": 200,
                "social-networks": 1500, "only-unavailable": 1500,
                "socseti-vpn": 1000, "basic-set": 800}
 
@@ -162,6 +153,12 @@ def main():
               % (pid, n, minimum, "OK" if ok else "THIN/SRS"))
         if not ok:
             fails.append(pid + " thin or rule_set")
+    for pid in ("ai", "anti-censorship", "russia-mimo", "ru-traffic-direct"):
+        if (PROF / (pid + ".json")).exists():
+            fails.append(pid + " should be deleted (spec 015)")
+            print("5. %-16s STILL ON DISK" % pid)
+        else:
+            print("5. %-16s absent OK" % pid)
     if fails:
         print("AUDIT-FAIL (%d):" % len(fails))
         for f in fails:

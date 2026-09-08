@@ -5,7 +5,7 @@ import json, os, sys, shutil, subprocess, pathlib
 HOME = pathlib.Path.home()
 BASE = HOME / 'AI' / 'singbox'
 # PROFILES extended by upload_profiles.py
-PROFILES = ("default", "ru-bez-vpn", "russia-mimo", "ru-traffic-direct", "popular-ai", "social-networks", "only-unavailable", "socseti-vpn", "basic-set")
+PROFILES = ("default", "ru-bez-vpn", "popular-ai", "social-networks", "only-unavailable", "socseti-vpn", "basic-set")
 CONFIGS = ['config.json', 'config-proxy.json']  # full not touched
 SB = '/usr/local/bin/sing-box'
 def load_profile(pid):
@@ -87,7 +87,7 @@ def apply(pid, check_only=False):
 
 if __name__ == '__main__':
     import argparse
-    ap = argparse.ArgumentParser(description='usage: apply-profile.py [--check] <default|ru-bez-vpn|russia-mimo|ru-traffic-direct|popular-ai|social-networks|only-unavailable|socseti-vpn|basic-set>')
+    ap = argparse.ArgumentParser(description='usage: apply-profile.py [--check] <default|ru-bez-vpn|popular-ai|social-networks|only-unavailable|socseti-vpn|basic-set>')
     ap.add_argument('profile', nargs='?', help='profile id')
     ap.add_argument('--check', action='store_true', help='validate only')
     args = ap.parse_args()

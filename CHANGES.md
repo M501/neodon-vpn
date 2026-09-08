@@ -18,6 +18,16 @@
   мёртвый preset_desc. Глиф ⓘ заменён (в шрифтах рисуется «0»).
 - 29/29 pytest + vision-пруф; деплой + рестарт.
 
+## 2026-09-08 (21) — Spec 015: дубли снесены везде (7 пресетов)
+
+### Снесены russia-mimo + ru-traffic-direct
+- GUI (уже 7 у параллельной сессии, diff = ровно удаление), hostctl,
+  apply-profile (в репо), фрагменты, 3 bak-папки, 12 бэкапов, stale gen.
+- v2RayTun Windows НЕ ТРОНУТ (запрет; процесс жив PID 22124).
+
+### Verify
+- reject/check/AUDIT-OK/parity-holds; 35/35; live md5 == project; CONNECTED.
+
 ## 2026-09-08 (20) — Spec 014: коронован пресет для россиянина
 
 ### Вердикт (живой тест, не мнение)
