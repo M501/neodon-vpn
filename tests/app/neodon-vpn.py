@@ -1176,9 +1176,10 @@ class MainWindow(QMainWindow):
         sl.addLayout(srow)
 
         gc, gl = self._card(bl, "GENERAL")
-        row = QHBoxLayout()
-        cb = QCheckBox("Запускать при старте системы")
-        gl.addWidget(cb)
+        auto = QLabel("VPN запускается системным сервисом автоматически.")
+        auto.setObjectName("muted")
+        auto.setWordWrap(True)
+        gl.addWidget(auto)
         dns_row = QHBoxLayout()
         dns_l = QLabel("DNS")
         dns_l.setObjectName("muted")

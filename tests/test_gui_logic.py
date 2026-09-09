@@ -581,6 +581,14 @@ def test_refresh_disables_buttons_until_done(monkeypatch):
     assert all(b.isEnabled() for b in win._refresh_btns)
 
 
+def test_no_dead_autostart_checkbox(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    texts = [l.text() for l in win.findChildren(m.QLabel)]
+    assert not any("Запускать при старте" in t for t in texts)
+    assert any("системным сервисом" in t for t in texts)
+
+
 def test_traffic_cards_render(monkeypatch, tmp_path):
     m = app()
     win = _make_win(m, monkeypatch)
