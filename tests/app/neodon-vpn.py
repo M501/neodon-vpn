@@ -1456,6 +1456,12 @@ class MainWindow(QMainWindow):
                 os.remove(ACTION_HOOK)
                 if isinstance(hook, dict) and hook.get("action") == "navigate":
                     self.navigate(hook.get("page") or "home")
+                elif isinstance(hook, dict) and hook.get("action") == "grab":
+                    try:
+                        self.grab().save(os.path.expanduser(
+                            hook.get("path") or "~/neodon-grab.png"))
+                    except RuntimeError:
+                        pass
                 elif isinstance(hook, dict) and hook.get("action") == "refresh":
                     self.refresh_sub()
                 elif isinstance(hook, dict) and hook.get("action") == "scroll":
