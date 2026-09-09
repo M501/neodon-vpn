@@ -1844,6 +1844,7 @@ class MainWindow(QMainWindow):
             return
         self._spin_angle = 0
         self._spin_phase = "run"
+        self._spin_rest = self.sub_refresh_btn.icon()
         self._spin_base = icon_pixmap("refresh", 18, "#3373F7")
         for b in getattr(self, "_refresh_btns", []):
             try:
@@ -1866,10 +1867,17 @@ class MainWindow(QMainWindow):
             base = getattr(self, "_spin_base", None)
             if base is None:
                 return
-            from PySide6.QtGui import QTransform
-            tr = QTransform().rotate(self._spin_angle % 360)
-            self.sub_refresh_btn.setIcon(QIcon(
-                base.transformed(tr, Qt.TransformationMode.SmoothTransformation)))
+            # fixed canvas: rotating the pixmap itself changes its bounding
+            # box (pulse back-and-forth); rotate the painter instead
+            from PySide6.QtGui import QPainter, QPixmap
+            canvas = QPixmap(26, 26)
+            canvas.fill(Qt.GlobalColor.transparent)
+            p = QPainter(canvas)
+            p.translate(13, 13)
+            p.rotate(self._spin_angle % 360)
+            p.drawPixmap(-base.width() // 2, -base.height() // 2, base)
+            p.end()
+            self.sub_refresh_btn.setIcon(QIcon(canvas))
         except RuntimeError:
             pass
 
@@ -1891,7 +1899,9 @@ class MainWindow(QMainWindow):
         self._spin_phase = "run"
         self._spin_angle = 0
         try:
-            self.sub_refresh_btn.setIcon(QIcon(self._spin_base))
+            rest = getattr(self, "_spin_rest", None)
+            if rest is not None:
+                self.sub_refresh_btn.setIcon(rest)
         except (RuntimeError, AttributeError):
             pass
         for b in getattr(self, "_refresh_btns", []):

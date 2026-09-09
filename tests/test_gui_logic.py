@@ -593,6 +593,7 @@ def test_refresh_disables_buttons_until_done(monkeypatch):
     assert win.sub_updated.text() == "Обновление…"
     assert all(not b.isEnabled() for b in win._refresh_btns)
     assert any("3373F7" in b.styleSheet() for b in win._refresh_btns)
+    rest_key = win.sub_refresh_btn.icon().cacheKey()
     a0 = win._spin_angle
     win._spin_tick()
     assert win._spin_angle != a0, "arrow rotates"
@@ -603,6 +604,7 @@ def test_refresh_disables_buttons_until_done(monkeypatch):
         win._spin_tick()
     assert getattr(win, "_spin_timer", None) is None, "settled home"
     assert win._spin_angle % 360 == 0
+    assert win.sub_refresh_btn.icon().cacheKey() == rest_key, "rest icon back"
     assert all(b.isEnabled() for b in win._refresh_btns)
     assert all(b.styleSheet() == "" for b in win._refresh_btns)
     assert win.sub_updated.text() != "Обновление…"
