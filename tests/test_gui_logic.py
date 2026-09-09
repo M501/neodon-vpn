@@ -592,12 +592,51 @@ def test_refresh_disables_buttons_until_done(monkeypatch):
     win.refresh_sub()
     assert win.sub_updated.text() == "Обновление…"
     assert all(not b.isEnabled() for b in win._refresh_btns)
+    assert any("3373F7" in b.styleSheet() for b in win._refresh_btns)
+    a0 = win._spin_angle
+    win._spin_tick()
+    assert win._spin_angle != a0, "arrow rotates"
     win._sub_loaded_full("")
+    for _ in range(30):
+        if getattr(win, "_spin_timer", None) is None:
+            break
+        win._spin_tick()
+    assert getattr(win, "_spin_timer", None) is None, "settled home"
+    assert win._spin_angle % 360 == 0
     assert all(b.isEnabled() for b in win._refresh_btns)
+    assert all(b.styleSheet() == "" for b in win._refresh_btns)
     assert win.sub_updated.text() != "Обновление…"
     win.refresh_sub()
     win._sub_failed("boom")
+    for _ in range(30):
+        if getattr(win, "_spin_timer", None) is None:
+            break
+        win._spin_tick()
     assert all(b.isEnabled() for b in win._refresh_btns)
+
+
+def test_spin_settles_home_from_any_angle(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.refresh_sub()
+    win._spin_angle = 105
+    win._spin_stop()
+    n = 0
+    while getattr(win, "_spin_timer", None) is not None and n < 30:
+        win._spin_tick()
+        n += 1
+    assert getattr(win, "_spin_timer", None) is None
+    assert n <= 24, n
+
+
+def test_spin_pixel_proof(monkeypatch, qtbot, tmp_path):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.refresh_sub()
+    qtbot.wait(350)
+    out = str(tmp_path / "spin.png")
+    assert win.sub_refresh_btn.grab().save(out), "grab failed"
+    print("SPIN-PNG:" + out)
 
 
 def test_no_dead_autostart_checkbox(monkeypatch):

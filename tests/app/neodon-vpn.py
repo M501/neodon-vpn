@@ -1456,6 +1456,8 @@ class MainWindow(QMainWindow):
                 os.remove(ACTION_HOOK)
                 if isinstance(hook, dict) and hook.get("action") == "navigate":
                     self.navigate(hook.get("page") or "home")
+                elif isinstance(hook, dict) and hook.get("action") == "refresh":
+                    self.refresh_sub()
                 elif isinstance(hook, dict) and hook.get("action") == "scroll":
                     # QA backdoor: scroll current page without synthetic touch
                     try:
@@ -1835,13 +1837,72 @@ class MainWindow(QMainWindow):
         w.fail.connect(self._sub_failed)
         w.start()
         self._workers.append(w)
+        self._spin_start()
 
-    def _refresh_restore(self):
+    def _spin_start(self):
+        if getattr(self, "_spin_timer", None) is not None:
+            return
+        self._spin_angle = 0
+        self._spin_phase = "run"
+        self._spin_base = icon_pixmap("refresh", 18, "#3373F7")
+        for b in getattr(self, "_refresh_btns", []):
+            try:
+                b.setStyleSheet("border: 2px solid #3373F7;")
+            except RuntimeError:
+                pass
+        t = QTimer(self)
+        t.setInterval(50)
+        t.timeout.connect(self._spin_tick)
+        self._spin_timer = t
+        t.start()
+
+    def _spin_tick(self):
+        try:
+            self._spin_angle = getattr(self, "_spin_angle", 0) + 15
+            if getattr(self, "_spin_phase", "run") == "settle" \
+                    and self._spin_angle % 360 == 0:
+                self._spin_finish()
+                return
+            base = getattr(self, "_spin_base", None)
+            if base is None:
+                return
+            from PySide6.QtGui import QTransform
+            tr = QTransform().rotate(self._spin_angle % 360)
+            self.sub_refresh_btn.setIcon(QIcon(
+                base.transformed(tr, Qt.TransformationMode.SmoothTransformation)))
+        except RuntimeError:
+            pass
+
+    def _spin_stop(self):
+        if getattr(self, "_spin_timer", None) is None:
+            return
+        self._spin_phase = "settle"
+        try:
+            self._spin_timer.setInterval(25)
+        except RuntimeError:
+            pass
+
+    def _spin_finish(self):
+        try:
+            self._spin_timer.stop()
+        except (RuntimeError, AttributeError):
+            pass
+        self._spin_timer = None
+        self._spin_phase = "run"
+        self._spin_angle = 0
+        try:
+            self.sub_refresh_btn.setIcon(QIcon(self._spin_base))
+        except (RuntimeError, AttributeError):
+            pass
         for b in getattr(self, "_refresh_btns", []):
             try:
                 b.setEnabled(True)
+                b.setStyleSheet("")
             except RuntimeError:
                 pass
+
+    def _refresh_restore(self):
+        self._spin_stop()
 
     def _sub_failed(self, err):
         self._refresh_restore()
