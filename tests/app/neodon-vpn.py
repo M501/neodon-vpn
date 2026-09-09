@@ -892,6 +892,7 @@ class MainWindow(QMainWindow):
         self.sub_refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.sub_refresh_btn.setToolTip("Обновить подписку")
         self.sub_refresh_btn.clicked.connect(self.refresh_sub)
+        self._refresh_btns = getattr(self, "_refresh_btns", []) + [self.sub_refresh_btn]
         subrow.addWidget(subdot)
         subrow.addWidget(self.sub_name)
         subrow.addStretch()
@@ -1168,6 +1169,7 @@ class MainWindow(QMainWindow):
         ref = QPushButton("Обновить подписку")
         ref.setObjectName("accent")
         ref.clicked.connect(self.refresh_sub)
+        self._refresh_btns = getattr(self, "_refresh_btns", []) + [ref]
         srow.addWidget(self.sub_updated)
         srow.addStretch()
         srow.addWidget(ref)
@@ -1782,12 +1784,32 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("URL подписки не найден", 6000)
             return
         self.statusBar().showMessage("Обновление подписки…")
+        for b in getattr(self, "_refresh_btns", []):
+            try:
+                b.setEnabled(False)
+            except RuntimeError:
+                pass
+        try:
+            self.sub_updated.setText("Обновление…")
+        except RuntimeError:
+            pass
         w = CmdWorker(script, 45)
         w.ok.connect(self._sub_loaded_full)
-        w.fail.connect(lambda err: self.statusBar().showMessage(
-            "Ошибка подписки: " + (err[-120:] if err else "?"), 8000))
+        w.fail.connect(self._sub_failed)
         w.start()
         self._workers.append(w)
+
+    def _refresh_restore(self):
+        for b in getattr(self, "_refresh_btns", []):
+            try:
+                b.setEnabled(True)
+            except RuntimeError:
+                pass
+
+    def _sub_failed(self, err):
+        self._refresh_restore()
+        self.statusBar().showMessage(
+            "Ошибка подписки: " + (err[-120:] if err else "?"), 8000)
 
     def _sub_clear(self):
         self.sub_progress.setValue(0)
@@ -1838,6 +1860,7 @@ class MainWindow(QMainWindow):
         self._apply_sub_info(out)
 
     def _sub_loaded_full(self, out):
+        self._refresh_restore()
         self._apply_sub_info(out)
         self.sub_updated.setText("Обновлено: " + time.strftime("%d.%m %H:%M"))
         self.reload_servers()

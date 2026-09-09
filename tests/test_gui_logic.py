@@ -567,6 +567,20 @@ def test_action_hook_scroll(monkeypatch, tmp_path):
     assert not (tmp_path / "gui-action.json").exists(), "hook consumed"
 
 
+def test_refresh_disables_buttons_until_done(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.refresh_sub()
+    assert win.sub_updated.text() == "Обновление…"
+    assert all(not b.isEnabled() for b in win._refresh_btns)
+    win._sub_loaded_full("")
+    assert all(b.isEnabled() for b in win._refresh_btns)
+    assert win.sub_updated.text() != "Обновление…"
+    win.refresh_sub()
+    win._sub_failed("boom")
+    assert all(b.isEnabled() for b in win._refresh_btns)
+
+
 def test_traffic_cards_render(monkeypatch, tmp_path):
     m = app()
     win = _make_win(m, monkeypatch)
