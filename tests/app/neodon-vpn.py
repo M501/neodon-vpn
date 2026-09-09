@@ -1727,14 +1727,22 @@ class MainWindow(QMainWindow):
     def start_ping(self):
         if not self.servers:
             return
+        self._ping_glow(True)
         w = PingWorker(self.servers)
         w.result.connect(self._on_ping_result)
         w.done.connect(self._ping_done)
         w.start()
         self._workers.append(w)
 
+    def _ping_glow(self, on):
+        try:
+            self.sub_ping_btn.setStyleSheet(
+                "border: 2px solid #3373F7;" if on else "")
+        except RuntimeError:
+            pass
+
     def _ping_done(self):
-        pass  # painted in place already; rebuild would flicker
+        self._ping_glow(False)  # latencies already painted in place
 
     def _select_server_idx(self, idx):
         if not (0 <= idx < len(self.servers)):
@@ -1845,7 +1853,8 @@ class MainWindow(QMainWindow):
         self._spin_angle = 0
         self._spin_phase = "run"
         self._spin_rest = self.sub_refresh_btn.icon()
-        self._spin_base = icon_pixmap("refresh", 18, "#3373F7")
+        # hires base: rotating a tiny pixmap crawls (shimmer); downscale hides it
+        self._spin_base = icon_pixmap("refresh", 48, "#3373F7")
         for b in getattr(self, "_refresh_btns", []):
             try:
                 b.setStyleSheet("border: 2px solid #3373F7;")
@@ -1870,10 +1879,12 @@ class MainWindow(QMainWindow):
             # fixed canvas: rotating the pixmap itself changes its bounding
             # box (pulse back-and-forth); rotate the painter instead
             from PySide6.QtGui import QPainter, QPixmap
-            canvas = QPixmap(26, 26)
+            canvas = QPixmap(68, 68)
             canvas.fill(Qt.GlobalColor.transparent)
             p = QPainter(canvas)
-            p.translate(13, 13)
+            p.setRenderHints(QPainter.RenderHint.Antialiasing
+                             | QPainter.RenderHint.SmoothPixmapTransform)
+            p.translate(34, 34)
             p.rotate(self._spin_angle % 360)
             p.drawPixmap(-base.width() // 2, -base.height() // 2, base)
             p.end()

@@ -631,6 +631,22 @@ def test_spin_settles_home_from_any_angle(monkeypatch):
     assert n <= 24, n
 
 
+def test_spin_hires_base(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win.refresh_sub()
+    assert win._spin_base.width() >= 48, "hires base kills shimmer"
+
+
+def test_ping_glow(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    win._ping_glow(True)
+    assert "3373F7" in win.sub_ping_btn.styleSheet()
+    win._ping_glow(False)
+    assert win.sub_ping_btn.styleSheet() == ""
+
+
 def test_spin_pixel_proof(monkeypatch, qtbot, tmp_path):
     m = app()
     win = _make_win(m, monkeypatch)
