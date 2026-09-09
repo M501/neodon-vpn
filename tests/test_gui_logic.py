@@ -450,6 +450,25 @@ def test_card_pixmap_missing():
     assert m.card_pixmap("/nonexistent/x.png") is None
 
 
+def test_elided_minimum_allows_shrink():
+    m = app()
+    assert m._ElidedLabel("very long server name here").minimumSizeHint().width() == 0
+
+
+def test_geom_roundtrip(monkeypatch, tmp_path):
+    m = app()
+    monkeypatch.setattr(m, "STATE_DIR", str(tmp_path))
+    win = _make_win(m, monkeypatch)
+    win.resize(700, 700)
+    win._save_geom()
+    win.resize(620, 680)
+    win._restore_geom()
+    assert (win.width(), win.height()) == (700, 700)
+    import json as _json
+    win.write_gui_state()
+    assert "geom" in _json.loads((tmp_path / "gui-state.json").read_text())
+
+
 def test_flag_code_brackets():
     m = app()
     assert m.flag_code("[PL] NEODON VPN x") == "PL"

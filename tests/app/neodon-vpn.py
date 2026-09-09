@@ -638,6 +638,10 @@ class _ElidedLabel(QLabel):
         self.style().drawItemText(p, self.contentsRect(), self.alignment(),
                                   self.palette(), True, el)
 
+    def minimumSizeHint(self):
+        # let the grid shrink us (elide paints …); default hint = full text
+        return QSize(0, self.fontMetrics().height())
+
 
 class _ClickFrame(QFrame):
     """Кликабельный QFrame (карточка-кнопка): QLabel-контент рендерится,
@@ -694,6 +698,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Neodon VPN")
         self.resize(720, 700)
         self.setMinimumSize(620, 680)
+        self._restore_geom()
         self.servers = []
         self.lats = {}
         self._workers = []
@@ -1589,11 +1594,42 @@ class MainWindow(QMainWindow):
             self.state_meta.setText("")
             self.timer_lbl.setText("00:00:00")
 
+    def _save_geom(self):
+        try:
+            p = os.path.join(STATE_DIR, "gui-state.json")
+            try:
+                with open(p) as f:
+                    st = json.load(f)
+            except (OSError, ValueError):
+                st = {}
+            st["geom"] = bytes(self.saveGeometry()).hex()
+            with open(p + ".tmp", "w") as f:
+                json.dump(st, f)
+            os.replace(p + ".tmp", p)
+        except (OSError, RuntimeError):
+            pass
+
+    def _restore_geom(self):
+        try:
+            with open(os.path.join(STATE_DIR, "gui-state.json")) as f:
+                g = json.load(f).get("geom")
+            if g:
+                self.restoreGeometry(bytes.fromhex(g))
+        except (OSError, ValueError, RuntimeError):
+            pass
+
     def write_gui_state(self):
         path = os.path.join(STATE_DIR, "gui-state.json")
         try:
+            try:
+                with open(path) as f:
+                    st = json.load(f)
+            except (OSError, ValueError):
+                st = {}
+            st.update({"state": self.state, "desired": self.desired,
+                       "ts": int(time.time())})
             with open(path + ".tmp", "w") as f:
-                json.dump({"state": self.state, "desired": self.desired, "ts": int(time.time())}, f)
+                json.dump(st, f)
             os.replace(path + ".tmp", path)
         except OSError:
             pass
@@ -1917,6 +1953,10 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         # minimize to tray instead of quit — like steam/qbit near clock
+        try:
+            self._save_geom()
+        except RuntimeError:
+            pass
         if getattr(self, "_really_quit", False):
             for w in list(self._workers):
                 try:
