@@ -1,0 +1,10 @@
+{
+  "name": "Neodon VPN",
+  "author": "M501",
+  "flags": [],
+  "api_version": 1,
+  "publish": {
+    "tags": ["vpn", "network", "proxy"],
+    "description": "Neodon VPN: proxy/tunnel/server switch for Bazzite handheld. Thin wrapper over the system backend, no logic duplicated."
+  }
+}

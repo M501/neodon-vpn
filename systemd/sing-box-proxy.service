@@ -1,0 +1,11 @@
+[Unit]
+Description=Neodon VPN (proxy only)
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/sing-box run -c %h/AI/singbox/config-proxy.json
+Restart=on-failure
+RestartSec=3
+[Install]
+WantedBy=default.target

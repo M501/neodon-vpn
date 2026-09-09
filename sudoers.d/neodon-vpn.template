@@ -1,0 +1,7 @@
+# Neodon VPN — least-privilege sudoers v0.1 (Installed by install.sh, @USER@ substituted).
+# Covers EXACTLY what the shipped scripts invoke; nothing else.
+# TODO(security-hardening): route all privileged ops through ONE neodon-priv
+# wrapper (allowlist up|down|status) instead of per-binary rules.
+@USER@ ALL=(root) NOPASSWD: /usr/sbin/firewall-cmd --direct *
+@USER@ ALL=(root) NOPASSWD: /usr/bin/tee /etc/resolv.conf*
+@USER@ ALL=(root) NOPASSWD: /usr/bin/loginctl enable-linger *
