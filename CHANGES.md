@@ -18,6 +18,13 @@
   мёртвый preset_desc. Глиф ⓘ заменён (в шрифтах рисуется «0»).
 - 29/29 pytest + vision-пруф; деплой + рестарт.
 
+## 2026-09-09 (33) — Spec 025: Decky-плагин жив
+
+### Построено
+- QAM-панель полного паритета (статус/exit, PROXY/TUNNEL, сервер, квота).
+- Backend allowlist-only, 6/6 headless. Сборка чистая (node via brew).
+- Loader: Loaded v0.1.0 → backend up, без ошибок.
+
 ## 2026-09-09 (32) — Decky-инцидент: меню пропало из QAM (не Neodon-код)
 
 ### Диагноз
