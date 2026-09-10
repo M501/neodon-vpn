@@ -42,8 +42,9 @@ function Content() {
       setServers(
         list.map((s: any, i: number) => ({ data: i, label: s.remarks || ("Сервер " + (i + 1)) }))
       );
-      const ai: number = Math.max(0, list.findIndex((s: any) => s.address && s.address === active));
-      setSrvIdx(ai);
+      const ai: number = list.findIndex((s: any) => s.address && s.address === active);
+      // Never snap back to first on a backend hiccup: keep current idx.
+      if (ai >= 0) setSrvIdx(ai);
       const qq: any = un(await call("get_quota"))?.quota;
       setQuota(qq && qq.used ? String(qq.used) : "");
     } catch (e) {
@@ -68,16 +69,12 @@ function Content() {
     setTimeout(refresh, 1200);
   }
 
-  async function stepServer(d: number) {
+  async function switchServer(i: number) {
     if (servers.length === 0) return;
-    const next: number = (srvIdx + d + servers.length) % servers.length;
-    setSrvIdx(next);
-    await call("set_server", next);
+    setSrvIdx(i);
+    await call("set_server", i);
     setTimeout(refresh, 1500);
   }
-
-  const curLabel: string =
-    servers.length > 0 ? String(servers[srvIdx]?.label || ("Сервер " + (srvIdx + 1))) : "…";
 
   return (
     <PanelSection title="Neodon VPN">
@@ -96,13 +93,12 @@ function Content() {
         onChange={(v: any) => switchMode((v?.data as Mode) || "smart")}
         strDefaultLabel="Режим"
       />
-      <div>{curLabel} ({servers.length > 0 ? srvIdx + 1 : 0}/{servers.length})</div>
-      <ButtonItem layout="below" onClick={() => stepServer(-1)}>
-        ◀ Предыдущий сервер
-      </ButtonItem>
-      <ButtonItem layout="below" onClick={() => stepServer(1)}>
-        Следующий сервер ▶
-      </ButtonItem>
+      <Dropdown
+        rgOptions={servers}
+        selectedOption={srvIdx}
+        onChange={(v: any) => switchServer(Number(v?.data ?? 0))}
+        strDefaultLabel="Сервер"
+      />
       <ButtonItem layout="below" onClick={async () => {
         setMeta("обновление подписки…");
         await call("refresh_sub");

@@ -24,6 +24,9 @@ async def main():
     check("reject-oor-idx", (await m.set_server(99999))["ok"] is False)
     sv = await m.get_servers()
     check("servers-list", sv.get("ok") is True and len(sv.get("servers", [])) > 0)
+    # active address must match a listed server (the QAM snap-back bug class)
+    addrs = {s.get("address") for s in sv.get("servers", [])}
+    check("servers-active-matches", sv.get("active") in addrs)
     check("quota-shape", isinstance(await m.get_quota(), dict))
     # nothing must have been mutated: mode file untouched, no workers spawned
     print("FAILURES:", fails if fails else "none")

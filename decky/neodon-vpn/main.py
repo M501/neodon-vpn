@@ -129,8 +129,9 @@ def _server_list():
 
 async def get_servers():
     sel = _read_json(SEL_SRV) or {}
+    # selected-server.json stores the key as "server" (not "address").
     return {"ok": True, "servers": _server_list(),
-            "active": sel.get("address")}
+            "active": sel.get("server") or sel.get("address")}
 
 
 async def set_server(idx):
