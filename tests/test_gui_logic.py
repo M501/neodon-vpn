@@ -674,6 +674,29 @@ def test_traffic_cards_render(monkeypatch, tmp_path):
     print("TRAFFIC-PNG:" + out)
 
 
+def test_server_select_never_connects(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    seen = {}
+
+    class RecWorker(QObject):
+        done = Signal(bool, str)
+        phase = Signal(str)
+
+        def __init__(self, idx, start_after=False, mode="smart"):
+            super().__init__()
+            seen.update(idx=idx, start_after=start_after, mode=mode)
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(m, "SelectWorker", RecWorker)
+    win.state = "OFF"
+    win._op_in_progress = False
+    win._start_server_worker(0)
+    assert seen.get("start_after") is False, seen
+
+
 def test_save_sub_url_roundtrip(monkeypatch, tmp_path):
     m = app()
     p = str(tmp_path / "neodon-sub.py")

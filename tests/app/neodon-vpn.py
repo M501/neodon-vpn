@@ -1786,11 +1786,13 @@ class MainWindow(QMainWindow):
         self._request_op("server", idx)
 
     def _start_server_worker(self, idx):
-        start_after = self.state != "CONNECTED"
+        # Select stages the server ONLY. Power comes exclusively from the
+        # main toggle — never auto-connect here (single shared backend:
+        # auto-connects from two UIs would fight over one sing-box).
         mode = self.desired if self.desired in ("full", "smart") else "smart"
         self._op_in_progress = True
         self.pill.set_state("TRANSITIONING")
-        w = SelectWorker(idx, start_after=start_after, mode=mode)
+        w = SelectWorker(idx, start_after=False, mode=mode)
         w.done.connect(self._select_done)
         try:
             w.phase.connect(lambda s: self.statusBar().showMessage(s, 4000))
