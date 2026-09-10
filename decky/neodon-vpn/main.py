@@ -11,6 +11,7 @@ import http.cookiejar
 import json
 import os
 import re
+import time
 import urllib.request
 
 try:
@@ -96,7 +97,34 @@ async def get_status():
     d["ok"] = True
     prof = d.get("profile") or ""
     d["profile_name"] = PRESET_NAMES.get(prof, prof)
+    d["connected_since"] = await _service_since(d.get("service") or "none")
     return d
+
+
+async def _service_since(svc):
+    """Epoch when the active sing-box unit entered active state (0 if none).
+
+    Honest uptime source for the QAM clock: survives panel reopen and
+    resets on every restart/reconnect, like the desktop timer.
+    Uses the monotonic stamp (no timezone parsing — the wallclock form
+    carries a zone abbreviation like MSK that strptime cannot parse).
+    """
+    if svc in ("none", ""):
+        return 0
+    rc, out, _ = await _run(
+        ["systemctl", "--user", "show", svc,
+         "-p", "ActiveEnterTimestampMonotonic", "--value"], 5)
+    if rc != 0:
+        return 0
+    try:
+        enter_us = int(out.strip())
+        if enter_us <= 0:
+            return 0
+        now_wall = datetime.datetime.now().timestamp()
+        now_mono_us = time.monotonic_ns() // 1000
+        return int(now_wall - (now_mono_us - enter_us) / 1_000_000)
+    except ValueError:
+        return 0
 
 
 async def vpn_up():

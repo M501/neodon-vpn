@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   PanelSection,
   ToggleField,
@@ -28,7 +28,8 @@ function Content() {
   const [on, setOn] = useState<boolean>(false);
   const [mode, setMode] = useState<Mode>("smart");
   const [meta, setMeta] = useState<string>("…");
-  const [upSecs, setUpSecs] = useState<number>(0);
+  const [, setTick] = useState<number>(0);
+  const sinceRef = useRef<number>(0);
   const [servers, setServers] = useState<DropdownOption[]>([]);
   const [srvIdx, setSrvIdx] = useState<number>(0);
   const [quota, setQuota] = useState<string>("");
@@ -40,11 +41,15 @@ function Content() {
       const ok: boolean = !!st?.ok;
       const actual: string = st?.actual_state || "?";
       const nowOn: boolean = ok && actual === "CONNECTED";
-      setOn((prev: boolean) => {
-        // Reset the clock on every fresh connect (client-side, like desktop).
-        if (nowOn && !prev) setUpSecs(0);
-        return nowOn;
-      });
+      // Honest clock: backend systemd timestamp wins (survives panel
+      // reopen); local arming is the fallback. Cleared on drop.
+      if (nowOn) {
+        const cs: number = Number(st?.connected_since || 0);
+        sinceRef.current = cs > 0 ? cs * 1000 : (sinceRef.current || Date.now());
+      } else {
+        sinceRef.current = 0;
+      }
+      setOn(nowOn);
       const dm: string = st?.desired_mode || "smart";
       setMode(dm === "full" ? "full" : "smart");
       const ip: string = st?.exit_ip || "—";
@@ -69,7 +74,7 @@ function Content() {
   useEffect(() => {
     refresh();
     const t = setInterval(refresh, 5000);
-    const u = setInterval(() => setUpSecs((v: number) => (on ? v + 1 : v)), 1000);
+    const u = setInterval(() => setTick((t: number) => t + 1), 1000);
     return () => {
       clearInterval(t);
       clearInterval(u);
@@ -98,7 +103,9 @@ function Content() {
     <PanelSection title="Neodon VPN">
       <div>Status: {on ? "● On" : "○ Off"} ({meta})</div>
       <ToggleField
-        label={on ? "VPN · " + fmtUptime(upSecs) : "VPN"}
+        label={on && sinceRef.current
+          ? "VPN · " + fmtUptime(Math.floor((Date.now() - sinceRef.current) / 1000))
+          : "VPN"}
         checked={on}
         onChange={(v: boolean) => power(v)}
       />

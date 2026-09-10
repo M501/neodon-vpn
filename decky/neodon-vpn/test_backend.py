@@ -28,6 +28,7 @@ async def main():
     addrs = {s.get("address") for s in sv.get("servers", [])}
     check("servers-active-matches", sv.get("active") in addrs)
     check("profile-name", isinstance(st.get("profile_name"), str) and len(st.get("profile_name", "")) > 0)
+    check("connected-since-int", isinstance(st.get("connected_since"), int))
     # preset map must not drift from the desktop PRESETS table
     import os
     import re
