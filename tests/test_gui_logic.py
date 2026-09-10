@@ -125,7 +125,7 @@ def test_sub_empty_uses_cache(monkeypatch, tmp_path):
          "expire": "Active until: 31 Jan 2027"}))
     win = _make_win(m, monkeypatch)
     win._apply_sub_info("")
-    assert win.sub_used.text() == "20.1 GB / 150 GB (кэш)"
+    assert win.sub_used.text() == "20.1 GB / 150 GB (cached)"
 
 
 def test_epoch_survives_single_blip(monkeypatch):
@@ -381,9 +381,9 @@ def test_active_preset_highlighted(monkeypatch):
 def test_preset_summary_counts():
     m = app()
     s = m.preset_summary(["geosite:category-ru", "domain:avito.st"], ["geosite:youtube"])
-    assert "2 зап." in s and "1 зап." in s
+    assert "direct: 2" in s and "via VPN: 1" in s
     assert "category-ru" in s and "youtube" in s
-    assert m.preset_summary([], []) == "без доп. записей"
+    assert m.preset_summary([], []) == "no extra rules"
 
 
 def test_preset_icon_fallback():
@@ -405,8 +405,8 @@ def test_active_tag_visibility(monkeypatch):
     assert len(opened) == 1
     texts = [l.text() for l in opened[0].findChildren(m.QLabel)]
     assert any("category-ru" in t for t in texts), texts
-    assert any("АКТИВЕН" in t for t in texts), texts
-    assert any("проверено вживую" in t for t in texts), texts
+    assert any("ACTIVE" in t for t in texts), texts
+    assert any("verified live" in t for t in texts), texts
     monkeypatch.setattr(m.QDialog, "exec", real_exec)
 
 
@@ -432,7 +432,7 @@ def test_dialog_canaries_live(monkeypatch):
     win.active_profile = "ru-bez-vpn"
     win.preset_details("ru-bez-vpn")
     texts = [l.text() for l in opened[0].findChildren(m.QLabel)]
-    assert any("ya.ru → напрямую ✓" in t for t in texts), texts
+    assert any("ya.ru → direct ✓" in t for t in texts), texts
     assert any("youtube.com → VPN ✓" in t for t in texts), texts
 
 
@@ -590,7 +590,7 @@ def test_refresh_disables_buttons_until_done(monkeypatch):
     m = app()
     win = _make_win(m, monkeypatch)
     win.refresh_sub()
-    assert win.sub_updated.text() == "Обновление…"
+    assert win.sub_updated.text() == "Refreshing…"
     assert all(not b.isEnabled() for b in win._refresh_btns)
     assert any("3373F7" in b.styleSheet() for b in win._refresh_btns)
     rest_key = win.sub_refresh_btn.icon().cacheKey()
@@ -607,7 +607,7 @@ def test_refresh_disables_buttons_until_done(monkeypatch):
     assert win.sub_refresh_btn.icon().cacheKey() == rest_key, "rest icon back"
     assert all(b.isEnabled() for b in win._refresh_btns)
     assert all(b.styleSheet() == "" for b in win._refresh_btns)
-    assert win.sub_updated.text() != "Обновление…"
+    assert win.sub_updated.text() != "Refreshing…"
     win.refresh_sub()
     win._sub_failed("boom")
     for _ in range(30):
@@ -662,7 +662,7 @@ def test_no_dead_autostart_checkbox(monkeypatch):
     win = _make_win(m, monkeypatch)
     texts = [l.text() for l in win.findChildren(m.QLabel)]
     assert not any("Запускать при старте" in t for t in texts)
-    assert any("системным сервисом" in t for t in texts)
+    assert any("system service" in t for t in texts)
 
 
 def test_traffic_cards_render(monkeypatch, tmp_path):

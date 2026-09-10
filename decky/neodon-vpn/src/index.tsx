@@ -16,31 +16,45 @@ type Mode = "smart" | "full";
 // one line, covers both wrapped and raw shapes).
 const un = (r: any): any => r?.result ?? r;
 
+function fmtUptime(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return h + ":" + p(m) + ":" + p(s);
+}
+
 function Content() {
   const [on, setOn] = useState<boolean>(false);
   const [mode, setMode] = useState<Mode>("smart");
   const [meta, setMeta] = useState<string>("…");
+  const [upSecs, setUpSecs] = useState<number>(0);
   const [servers, setServers] = useState<DropdownOption[]>([]);
   const [srvIdx, setSrvIdx] = useState<number>(0);
   const [quota, setQuota] = useState<string>("");
-  const [profile, setProfile] = useState<string>("");
+  const [rulesName, setRulesName] = useState<string>("");
 
   async function refresh() {
     try {
       const st: any = un(await call("get_status"));
       const ok: boolean = !!st?.ok;
       const actual: string = st?.actual_state || "?";
-      setOn(ok && actual === "CONNECTED");
+      const nowOn: boolean = ok && actual === "CONNECTED";
+      setOn((prev: boolean) => {
+        // Reset the clock on every fresh connect (client-side, like desktop).
+        if (nowOn && !prev) setUpSecs(0);
+        return nowOn;
+      });
       const dm: string = st?.desired_mode || "smart";
       setMode(dm === "full" ? "full" : "smart");
       const ip: string = st?.exit_ip || "—";
       setMeta(actual + " · " + ip);
-      setProfile(st?.profile || "");
+      setRulesName(st?.profile_name || st?.profile || "");
       const sv: any = un(await call("get_servers"));
       const list: any[] = sv?.servers || [];
       const active: string = sv?.active || "";
       setServers(
-        list.map((s: any, i: number) => ({ data: i, label: s.remarks || ("Сервер " + (i + 1)) }))
+        list.map((s: any, i: number) => ({ data: i, label: s.remarks || ("Server " + (i + 1)) }))
       );
       const ai: number = list.findIndex((s: any) => s.address && s.address === active);
       // Never snap back to first on a backend hiccup: keep current idx.
@@ -48,14 +62,18 @@ function Content() {
       const qq: any = un(await call("get_quota"))?.quota;
       setQuota(qq && qq.used ? String(qq.used) : "");
     } catch (e) {
-      setMeta("ошибка опроса");
+      setMeta("poll error");
     }
   }
 
   useEffect(() => {
     refresh();
     const t = setInterval(refresh, 5000);
-    return () => clearInterval(t);
+    const u = setInterval(() => setUpSecs((v: number) => (on ? v + 1 : v)), 1000);
+    return () => {
+      clearInterval(t);
+      clearInterval(u);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -78,9 +96,9 @@ function Content() {
 
   return (
     <PanelSection title="Neodon VPN">
-      <div>Статус: {on ? "● Вкл" : "○ Выкл"} ({meta})</div>
+      <div>Status: {on ? "● On" : "○ Off"} ({meta})</div>
       <ToggleField
-        label="VPN"
+        label={on ? "VPN · " + fmtUptime(upSecs) : "VPN"}
         checked={on}
         onChange={(v: boolean) => power(v)}
       />
@@ -91,23 +109,24 @@ function Content() {
         ]}
         selectedOption={mode}
         onChange={(v: any) => switchMode((v?.data as Mode) || "smart")}
-        strDefaultLabel="Режим"
+        strDefaultLabel="Mode"
       />
       <Dropdown
         rgOptions={servers}
         selectedOption={srvIdx}
         onChange={(v: any) => switchServer(Number(v?.data ?? 0))}
-        strDefaultLabel="Сервер"
+        strDefaultLabel="Server"
       />
       <ButtonItem layout="below" onClick={async () => {
-        setMeta("обновление подписки…");
+        setMeta("refreshing subscription…");
         await call("refresh_sub");
         refresh();
       }}>
-        Обновить (серверы + трафик)
+        Refresh (servers + usage)
       </ButtonItem>
-      {quota !== "" && <div>Трафик: {quota}</div>}
-      {profile !== "" && <div>Профиль: {profile} (как в десктопе)</div>}
+      {quota !== "" && <div>Usage: {quota}</div>}
+      {rulesName !== "" && <div>Traffic rules: {rulesName}</div>}
+      <div>* rules come from the desktop app</div>
     </PanelSection>
   );
 }

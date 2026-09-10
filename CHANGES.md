@@ -18,6 +18,14 @@
   мёртвый preset_desc. Глиф ⓘ заменён (в шрифтах рисуется «0»).
 - 29/29 pytest + vision-пруф; деплой + рестарт.
 
+## 2026-09-10 (39) — Spec 028: English UI + uptime + traffic-rules footnote
+
+- QAM: `VPN · H:MM:SS` в тумблере (сброс при реконнекте), `Traffic rules:
+  <name>` + сноска `* rules come from the desktop app`. Весь текст EN.
+- PRESET_NAMES + profile_name; дрейф-страж `preset-names-cover-desktop`.
+- Десктоп: ~45 UI-строк RU→EN (комменты/данные провайдера не тронуты).
+- 52/52 + 9/9 хост, harness зелёный, оба конца задеплоены.
+
 ## 2026-09-10 (38) — Смена сервера: чинилась не там (дисплей врал, бэкенд работал)
 
 ### Корень (логи WS + файлы, не гадание)

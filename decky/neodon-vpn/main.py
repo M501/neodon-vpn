@@ -29,6 +29,18 @@ CONVERTER = os.path.join(HOME, "AI", "neodon-sub", "neodon-sub.py")
 
 MODES = ("smart", "full")
 ID_RE = re.compile(r"^[0-9]+$")
+
+# Desktop preset display names (English, mirrors PRESETS in neodon-vpn.py).
+# Game panel shows these so both UIs call rules by the same names.
+PRESET_NAMES = {
+    "default": "Default",
+    "ru-bez-vpn": ".RU without VPN",
+    "popular-ai": "Popular AI",
+    "social-networks": "Social Networks",
+    "only-unavailable": "Blocked-only",
+    "socseti-vpn": "Social via VPN",
+    "basic-set": "Basic Set",
+}
 USERINFO_RE = re.compile(r"upload=(\d+);\s*download=(\d+);\s*total=(\d+);\s*expire=(\d+)")
 
 
@@ -82,6 +94,8 @@ async def get_status():
     except ValueError:
         return {"ok": False, "error": "bad status json"}
     d["ok"] = True
+    prof = d.get("profile") or ""
+    d["profile_name"] = PRESET_NAMES.get(prof, prof)
     return d
 
 

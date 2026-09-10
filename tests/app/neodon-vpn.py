@@ -78,26 +78,26 @@ FLAGS_DIR = os.path.join(APP_DIR, "flags")
 # Правила Neodon-базовые (private/ozon/bittorrent/process) добавляются всегда.
 # ---------------------------------------------------------------------------
 PRESETS = [
-    ("default", "Default", "🌐", "RU/торренты/Steam/Ozon напрямую, остальное — через VPN", False,
+    ("default", "Default", "🌐", "RU/torrents/Steam/Ozon direct, rest via VPN", False,
      True, [], [], []),
-    ("ru-bez-vpn", ".RU без VPN", "🇷🇺", "Отправляет весь RU трафик без ВПН", True,
+    ("ru-bez-vpn", ".RU without VPN", "🇷🇺", "Routes all RU traffic bypassing VPN", True,
      True, ["domain:avito.st", "geosite:category-ru", "regexp:.*\\.ru$", "regexp:.*\\.xn--p1ai$"], [], []),
 
-    ("popular-ai", "Popular AI", "🤖", "Популярные нейросети через VPN, остальной трафик мимо VPN", True,
+    ("popular-ai", "Popular AI", "🤖", "Popular AI nets via VPN, rest bypasses VPN", True,
      False, [], ["geosite:category-ai-!cn", "geosite:category-ai-cn"], []),
-    ("social-networks", "Social Networks", "💬", "Популярные соцсети через VPN, остальной трафик напрямую", False,
+    ("social-networks", "Social Networks", "💬", "Popular social nets via VPN, rest direct", False,
      False, [], ["geosite:discord", "geosite:github", "geosite:google", "geosite:meta", "geosite:openai",
                  "geosite:spotify", "geosite:telegram", "geosite:tiktok", "geosite:vk", "geosite:whatsapp"], []),
-    ("only-unavailable", "Только недоступные ресурсы", "🚫", "Через VPN только большинство недоступных в РФ ресурсов", False,
+    ("only-unavailable", "Blocked-only", "🚫", "Only resources blocked in RU via VPN", False,
      False, [], ["geosite:anime", "geosite:anthropic", "geosite:artstation", "geosite:discord",
                  "geosite:google-gemini", "geosite:instagram", "geosite:linkedin", "geosite:meta",
                  "geosite:microsoft", "geosite:notion", "geosite:openai", "geosite:soundcloud",
                  "geosite:speedtest", "geosite:spotify", "geosite:tiktok", "geosite:twitch",
                  "geosite:twitter", "geosite:youtube"], []),
-    ("socseti-vpn", "Соцсети через впн", "📱", "YouTube, Google, Instagram, TikTok, Discord, ChatGPT, WhatsApp, Telegram, Spotify через VPN", False,
+    ("socseti-vpn", "Social via VPN", "📱", "YouTube, Google, Instagram, TikTok, Discord, ChatGPT, WhatsApp, Telegram, Spotify via VPN", False,
      False, [], ["geosite:discord", "geosite:google", "geosite:instagram", "geosite:openai",
                  "geosite:spotify", "geosite:telegram", "geosite:tiktok", "geosite:whatsapp", "geosite:youtube"], []),
-    ("basic-set", "Базовый набор", "🧩", "Instagram, YouTube, Telegram, WhatsApp, TikTok, Discord, ChatGPT", False,
+    ("basic-set", "Basic Set", "🧩", "Instagram, YouTube, Telegram, WhatsApp, TikTok, Discord, ChatGPT", False,
      False, [], ["domain:1e100.net", "domain:bcvcdn.com", "domain:cdninstagram.com", "domain:chatgpt.com",
                  "domain:discord.com", "domain:discord.gg", "domain:discordapp.com", "domain:discordapp.net",
                  "domain:fbcdn.net", "domain:googlevideo.com", "domain:instagram.com", "domain:tiktok.tv",
@@ -111,14 +111,14 @@ def preset_summary(direct, proxy):
     """One-line rule census for a preset card: counts only, no claims."""
     parts = []
     if direct:
-        parts.append("напрямую: %d зап." % len(direct))
+        parts.append("direct: %d" % len(direct))
     if proxy:
-        parts.append("через VPN: %d зап." % len(proxy))
+        parts.append("via VPN: %d" % len(proxy))
     gs = sorted({e.split(":", 1)[1] for e in list(direct) + list(proxy)
                  if e.startswith("geosite:")})
     if gs:
-        parts.append("категории: " + ", ".join(gs[:6]) + ("…" if len(gs) > 6 else ""))
-    return " · ".join(parts) if parts else "без доп. записей"
+        parts.append("groups: " + ", ".join(gs[:6]) + ("…" if len(gs) > 6 else ""))
+    return " · ".join(parts) if parts else "no extra rules"
 
 ICONS_DIR = os.path.join(APP_DIR, "icons")
 
@@ -392,7 +392,7 @@ def save_sub_url(url, path=None):
     """
     url = (url or "").strip()
     if not re.match(r"^https?://\S+$", url):
-        return "URL должен начинаться с http(s)://"
+        return "URL must start with http(s)://"
     p = path or CONVERTER
     try:
         src = open(p, encoding="utf-8", errors="replace").read()
@@ -518,7 +518,7 @@ class CmdWorker(QThread):
         if rc == 0:
             self.ok.emit(out)
         else:
-            self.fail.emit(err or out or "ошибка")
+            self.fail.emit(err or out or "error")
 
 
 class ToggleWorker(QThread):
@@ -549,17 +549,17 @@ class SelectWorker(QThread):
 
     def run(self):
         cmd = host_cmd("neodon-hostctl server %d" % self.idx) if SANDBOX else "bash %s set %d" % (SERVER_SCRIPT, self.idx)
-        self.phase.emit("Смена сервера…")
+        self.phase.emit("Switching server…")
         rc, out, err = run_cmd(cmd, 10)
         if rc != 0:
-            self.done.emit(False, out or err or "не удалось сменить сервер")
+            self.done.emit(False, out or err or "server switch failed")
             return
         if self.start_after:
-            self.phase.emit("Сервер выбран, подключение…")
+            self.phase.emit("Server selected, connecting…")
             cmd2 = host_cmd("neodon-hostctl start %s" % self.mode) if SANDBOX else "bash %s %s" % (TOGGLE, self.mode)
             rc2, out2, err2 = run_cmd(cmd2, 12)
             if rc2 != 0:
-                self.done.emit(False, out2 or err2 or "не удалось подключиться")
+                self.done.emit(False, out2 or err2 or "connection failed")
                 return
         self.done.emit(True, out)
 
@@ -778,10 +778,10 @@ class MainWindow(QMainWindow):
         sl.setContentsMargins(6, 10, 6, 10)
         sl.setSpacing(6)
         self.nav_btns = {}
-        for key, icon, tip in (("home", "home", "Главная"),
-                               ("settings", "settings", "Настройки"),
-                               ("logs", "logs", "Логи"),
-                               ("apps", "folder", "Приложения")):
+        for key, icon, tip in (("home", "home", "Home"),
+                               ("settings", "settings", "Settings"),
+                               ("logs", "logs", "Logs"),
+                               ("apps", "folder", "Apps")):
             b = IconButton(icon, tip=tip)
             b.setToolTip(tip)
             b.setCheckable(True)
@@ -790,7 +790,7 @@ class MainWindow(QMainWindow):
             self.nav_btns[key] = b
         sl.addStretch()
         info = IconButton("info", color="#6B6B76", object_name="sidebarBtn")
-        info.setToolTip("О программе")
+        info.setToolTip("About")
         info.clicked.connect(lambda: self.navigate("about"))
         sl.addWidget(info)
 
@@ -905,7 +905,7 @@ class MainWindow(QMainWindow):
         ml.addLayout(mrow)
 
         # карточки Traffic rules / Routing
-        tr = self._row_card(bl, "folder", "Traffic rules", "Пресеты правил сообщества",
+        tr = self._row_card(bl, "folder", "Traffic rules", "Community rule presets",
                             lambda: self.navigate("traffic"))
         # Routing убран: дубль Traffic rules (фиктивный дубликат)
 
@@ -921,13 +921,13 @@ class MainWindow(QMainWindow):
         self.sub_refresh_btn.setObjectName("ghost")
         self.sub_refresh_btn.setFixedSize(30, 30)
         self.sub_refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sub_refresh_btn.setToolTip("Обновить подписку")
+        self.sub_refresh_btn.setToolTip("Refresh subscription")
         self.sub_refresh_btn.clicked.connect(self.refresh_sub)
         self._refresh_btns = getattr(self, "_refresh_btns", []) + [self.sub_refresh_btn]
         subrow.addWidget(subdot)
         subrow.addWidget(self.sub_name)
         subrow.addStretch()
-        self.sub_ping_btn = QPushButton("Пинг")
+        self.sub_ping_btn = QPushButton("Ping")
         self.sub_ping_btn.setObjectName("ghost")
         self.sub_ping_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.sub_ping_btn.clicked.connect(self.start_ping)
@@ -948,7 +948,7 @@ class MainWindow(QMainWindow):
         qrow.addStretch()
         qrow.addWidget(self.sub_expire)
         sl.addLayout(qrow)
-        hint2 = QLabel("Нажмите ↻, если не работает VPN")
+        hint2 = QLabel("Press ↻ if VPN is down")
         hint2.setObjectName("hint")
         sl.addWidget(hint2)
         # servers: 2-column grid inside main scroll — no inner scroll, drag anywhere scrolls page
@@ -959,7 +959,7 @@ class MainWindow(QMainWindow):
         self.srv_grid.setAlignment(Qt.AlignmentFlag.AlignTop)
         sl.addWidget(self.srv_container)
 
-        hint = QLabel("Нажмите на сервер, чтобы подключиться или сменить его. Если VPN не работает — переключите сервер или нажмите ↻.")
+        hint = QLabel("Click a server to connect or switch. If VPN is down — switch server or press ↻.")
         hint.setObjectName("hint")
         hint.setWordWrap(True)
         bl.addWidget(hint)
@@ -1009,7 +1009,7 @@ class MainWindow(QMainWindow):
         w, bl = self._page("Traffic rules")
         self.stack.addWidget(w)
         self.pages["traffic"] = w
-        desc = QLabel("Пресет правил под свои нужды. Тап — применить; активный подсвечен. Режим TUNNEL игнорирует правила.")
+        desc = QLabel("Rule preset for your needs. Tap to apply; active is highlighted. TUNNEL mode ignores rules.")
         desc.setObjectName("muted")
         desc.setWordWrap(True)
         bl.addWidget(desc)
@@ -1022,11 +1022,11 @@ class MainWindow(QMainWindow):
         uh.addWidget(ul)
         uh.addStretch(1)
         self.use_preset_cb = QCheckBox()
-        self.use_preset_cb.setToolTip("Выкл — базовый набор Default")
+        self.use_preset_cb.setToolTip("Off — Default base set")
         self.use_preset_cb.toggled.connect(self.on_use_preset)
         uh.addWidget(self.use_preset_cb)
         bl.addWidget(use_row)
-        info = QLabel("Community rules — готовые правила от сообщества под разные нужды.")
+        info = QLabel("Community rules — ready presets for different needs.")
         info.setObjectName("muted")
         info.setWordWrap(True)
         bl.addWidget(info)
@@ -1057,7 +1057,7 @@ class MainWindow(QMainWindow):
             if verified:
                 dot = QLabel("●")
                 dot.setStyleSheet("color: #3373F7; font-size: 12px;")
-                dot.setToolTip("Проверено вживую")
+                dot.setToolTip("Verified live")
                 nh.addWidget(dot)
             nh.addStretch(1)
             v.addLayout(nh)
@@ -1065,10 +1065,10 @@ class MainWindow(QMainWindow):
             ds.setObjectName("muted")
             ds.setWordWrap(True)
             v.addWidget(ds)
-            ft = QLabel("остальное — через VPN" if gproxy else "остальное — напрямую")
+            ft = QLabel("rest via VPN" if gproxy else "rest direct")
             ft.setObjectName("hint")
             v.addWidget(ft)
-            act = QLabel("● АКТИВЕН")
+            act = QLabel("● ACTIVE")
             act.setObjectName("activeTag")
             act.setVisible(False)
             v.addWidget(act)
@@ -1110,7 +1110,7 @@ class MainWindow(QMainWindow):
         d.setObjectName("muted")
         d.setWordWrap(True)
         lay.addWidget(d)
-        f = QLabel("остальное — " + ("через VPN" if gproxy else "напрямую"))
+        f = QLabel("rest — " + ("via VPN" if gproxy else "direct"))
         f.setObjectName("hint")
         lay.addWidget(f)
         c = QLabel(preset_summary(direct, proxy))
@@ -1121,32 +1121,32 @@ class MainWindow(QMainWindow):
             live = []
             for _dom, _exp in CANARIES.get(pid, []):
                 _got, _ = route_lookup(_dom)
-                _want = "VPN" if _exp == "proxy" else "напрямую"
+                _want = "VPN" if _exp == "proxy" else "direct"
                 if _got == _exp:
                     live.append("%s → %s ✓" % (_dom, _want))
                 elif _got == "?":
                     live.append("%s → %s …" % (_dom, _want))
                 else:
-                    live.append("%s → %s ✗ сейчас %s"
-                                % (_dom, _want, "VPN" if _got == "proxy" else "напрямую"))
+                    live.append("%s → %s ✗ now %s"
+                                % (_dom, _want, "VPN" if _got == "proxy" else "direct"))
         else:
-            live = ["%s → %s (когда применишь)" % (_dom, "VPN" if _exp == "proxy" else "напрямую")
+            live = ["%s → %s (when applied)" % (_dom, "VPN" if _exp == "proxy" else "direct")
                     for _dom, _exp in CANARIES.get(pid, [])]
         if live:
             lv = QLabel("\n".join(live))
             lv.setObjectName("hint")
             lv.setWordWrap(True)
             lay.addWidget(lv)
-        v = QLabel(("✓ проверено вживую" if verified else "○ ещё не проверялось")
-                   + (" · АКТИВЕН" if pid == self.active_profile else ""))
+        v = QLabel(("✓ verified live" if verified else "○ not verified yet")
+                   + (" · ACTIVE" if pid == self.active_profile else ""))
         v.setObjectName("muted")
         lay.addWidget(v)
         row = QHBoxLayout()
         if pid != self.active_profile:
-            ap = QPushButton("Применить")
+            ap = QPushButton("Apply")
             ap.clicked.connect(lambda: (self.select_preset(pid), dlg.accept()))
             row.addWidget(ap)
-        cl = QPushButton("Закрыть")
+        cl = QPushButton("Close")
         cl.clicked.connect(dlg.accept)
         row.addWidget(cl)
         lay.addLayout(row)
@@ -1158,7 +1158,7 @@ class MainWindow(QMainWindow):
             return
         w = CmdWorker(host_cmd("neodon-hostctl profile %s" % pid), 15)
         w.ok.connect(lambda _out, p=pid: self._preset_ok(p))
-        w.fail.connect(lambda err: self.statusBar().showMessage("Ошибка профиля: %s" % err, 6000))
+        w.fail.connect(lambda err: self.statusBar().showMessage("Profile error: %s" % err, 6000))
         w.start()
         self._workers.append(w)
 
@@ -1192,14 +1192,14 @@ class MainWindow(QMainWindow):
         sc, sl = self._card(bl, "SUBSCRIPTION")
         url, _, _ = converter_consts()
         self.sub_url = QLineEdit(url or "")
-        self.sub_url.setPlaceholderText("https://… — ссылка от VPN-провайдера")
+        self.sub_url.setPlaceholderText("https://… — provider subscription link")
         sl.addWidget(self.sub_url)
         srow = QHBoxLayout()
-        self.sub_updated = QLabel("Обновлено: —")
+        self.sub_updated = QLabel("Updated: —")
         self.sub_updated.setObjectName("muted")
-        save = QPushButton("Сохранить ссылку")
+        save = QPushButton("Save link")
         save.clicked.connect(self.save_sub)
-        ref = QPushButton("Обновить подписку")
+        ref = QPushButton("Refresh subscription")
         ref.setObjectName("accent")
         ref.clicked.connect(self.refresh_sub)
         self._refresh_btns = getattr(self, "_refresh_btns", []) + [ref]
@@ -1210,7 +1210,7 @@ class MainWindow(QMainWindow):
         sl.addLayout(srow)
 
         gc, gl = self._card(bl, "GENERAL")
-        auto = QLabel("VPN запускается системным сервисом автоматически.")
+        auto = QLabel("VPN starts automatically via the system service.")
         auto.setObjectName("muted")
         auto.setWordWrap(True)
         gl.addWidget(auto)
@@ -1223,11 +1223,11 @@ class MainWindow(QMainWindow):
         gl.addLayout(dns_row)
 
         g2, g2l = self._card(bl, "APP ROUTING")
-        desc = QLabel("Приложения, которые ходят напрямую (в обход VPN) в PROXY-режиме.")
+        desc = QLabel("Apps that go direct (bypass VPN) in PROXY mode.")
         desc.setObjectName("muted")
         desc.setWordWrap(True)
         g2l.addWidget(desc)
-        btn = QPushButton("Настроить приложения")
+        btn = QPushButton("Configure apps")
         btn.setObjectName("accent")
         btn.clicked.connect(lambda: self.navigate("apps"))
         g2l.addWidget(btn)
@@ -1244,10 +1244,10 @@ class MainWindow(QMainWindow):
         self.log_view.setMaximumBlockCount(2000)
         bl.addWidget(self.log_view, 1)
         lrow = QHBoxLayout()
-        clr = QPushButton("Очистить")
+        clr = QPushButton("Clear")
         clr.setObjectName("ghost")
         clr.clicked.connect(lambda: self.log_view.clear())
-        ref = QPushButton("Обновить")
+        ref = QPushButton("Refresh")
         ref.setObjectName("accent")
         ref.clicked.connect(self.refresh_logs)
         lrow.addStretch()
@@ -1268,10 +1268,10 @@ class MainWindow(QMainWindow):
 
     # ---- Apps (V1 AppsDialog, встроенный) ----
     def _build_apps(self):
-        w, bl = self._page("Маршрутизация приложений")
+        w, bl = self._page("App routing")
         self.stack.addWidget(w)
         self.pages["apps"] = w
-        hint = QLabel("Отметьте приложения, которые должны ходить напрямую (в обход VPN).")
+        hint = QLabel("Tick apps that must go direct (bypass VPN).")
         hint.setObjectName("muted")
         bl.addWidget(hint)
         self.apps_scroll = QScrollArea()
@@ -1283,7 +1283,7 @@ class MainWindow(QMainWindow):
         self.apps_rows.setContentsMargins(4, 4, 4, 4)
         self.apps_scroll.setWidget(self.apps_cont)
         bl.addWidget(self.apps_scroll, 1)
-        self.apps_done = QPushButton("Применить")
+        self.apps_done = QPushButton("Apply")
         self.apps_done.setObjectName("accent")
         bl.addWidget(self.apps_done)
         self._apps_loaded = False
@@ -1291,18 +1291,18 @@ class MainWindow(QMainWindow):
 
     # ---- About ----
     def _build_about(self):
-        w, bl = self._page("О программе")
+        w, bl = self._page("About")
         self.stack.addWidget(w)
         self.pages["about"] = w
         t = QLabel("Neodon VPN")
         t.setObjectName("h1")
         t.setAlignment(Qt.AlignmentFlag.AlignCenter)
         bl.addWidget(t)
-        v = QLabel("V2 — клон v2RayTun для Linux (Bazzite)")
+        v = QLabel("V2 — v2RayTun clone for Linux (Bazzite)")
         v.setObjectName("muted")
         v.setAlignment(Qt.AlignmentFlag.AlignCenter)
         bl.addWidget(v)
-        e = QLabel("sing-box engine · PySide6 GUI · правила сообщества из v2RayTun")
+        e = QLabel("sing-box engine · PySide6 GUI · community rules from v2RayTun")
         e.setObjectName("muted")
         e.setAlignment(Qt.AlignmentFlag.AlignCenter)
         bl.addWidget(e)
@@ -1336,7 +1336,7 @@ class MainWindow(QMainWindow):
             if time.monotonic() < getattr(self, "_settle_until", 0):
                 # double-tap guard: a tap landing right after OFF would
                 # re-enable the VPN and look like "off didn't work"
-                self.statusBar().showMessage("Операция только завершилась — подождите…", 3000)
+                self.statusBar().showMessage("Last op just finished — wait…", 3000)
                 return
         except RuntimeError:
             pass
@@ -1350,7 +1350,7 @@ class MainWindow(QMainWindow):
         (a dropped off-press during a switch looked like 'off is broken')."""
         if self._op_in_progress:
             self._pending = (kind, args)
-            self.statusBar().showMessage("Операция уже выполняется — поставлю в очередь…", 4000)
+            self.statusBar().showMessage("Op already running — queueing…", 4000)
             return
         self._run_op(kind, *args)
 
@@ -1367,7 +1367,7 @@ class MainWindow(QMainWindow):
 
     def toggle(self, mode):
         if self._op_in_progress:
-            self.statusBar().showMessage("Операция уже выполняется — подождите…", 4000)
+            self.statusBar().showMessage("Op already running — wait…", 4000)
             return
         self._op_in_progress = True
         self._fast_poll_until = time.monotonic() + 12
@@ -1383,7 +1383,7 @@ class MainWindow(QMainWindow):
     def _toggle_done(self, ok, out):
         self._op_in_progress = False
         self._settle_until = time.monotonic() + 5
-        self.statusBar().showMessage(out or ("Готово" if ok else "Ошибка"), 6000)
+        self.statusBar().showMessage(out or ("Done" if ok else "Error"), 6000)
         self.poll_status()
         self._drain_pending()
 
@@ -1446,9 +1446,9 @@ class MainWindow(QMainWindow):
             tag = d.get("server_tag") or ""
             if tag:
                 srv = " · " + tag.split("]")[-1].strip()[:24]
-            human = {"CONNECTED": "ON", "TRANSITIONING": "переход…",
-                     "STARTING": "переход…", "CONNECTING": "переход…",
-                     "STOPPING": "переход…"}.get(s, s)
+            human = {"CONNECTED": "ON", "TRANSITIONING": "switching…",
+                     "STARTING": "switching…", "CONNECTING": "switching…",
+                     "STOPPING": "switching…"}.get(s, s)
             mode = self.MODE_LABELS.get(getattr(self, "mode", ""), "") or ""
             me = (" · " + mode) if mode and s == "CONNECTED" else ""
             tray.setToolTip("Neodon VPN — %s%s%s" % (human, me, srv))
@@ -1538,7 +1538,7 @@ class MainWindow(QMainWindow):
         try:
             d = json.loads(out)
         except ValueError:
-            self.statusBar().showMessage("Не удалось прочитать статус бэкенда", 5000)
+            self.statusBar().showMessage("Backend status unreadable", 5000)
             return
         if not isinstance(d, dict):
             return
@@ -1619,14 +1619,14 @@ class MainWindow(QMainWindow):
             tag = d.get("server_tag") or ""
             ip = d.get("exit_ip") or "—"
             lat = d.get("latency_ms")
-            self.state_meta.setText("%s\nIP: %s · %s мс" % (tag, ip, lat if lat is not None else "—"))
+            self.state_meta.setText("%s\nIP: %s · %s ms" % (tag, ip, lat if lat is not None else "—"))
             self.timer_lbl.setText(self.timer_lbl.text() or "00:00:00")
         elif st == "LOCKED":
-            self.state_meta.setText("Трафик заблокирован намеренно: VPN недоступен, firewall активен.")
+            self.state_meta.setText("Traffic blocked on purpose: VPN down, firewall active.")
         elif st == "FAILED":
-            self.state_meta.setText("Не удалось подключиться. Нажмите кнопку питания для повтора.")
+            self.state_meta.setText("Connection failed. Press power to retry.")
         elif st == "DEGRADED":
-            self.state_meta.setText("Переключение...")
+            self.state_meta.setText("Switching...")
         else:
             self.state_meta.setText("")
             self.timer_lbl.setText("00:00:00")
@@ -1698,7 +1698,7 @@ class MainWindow(QMainWindow):
                 child.widget().deleteLater()
         COLS = 2
         for i, s in enumerate(self.servers):
-            remark = s.get("remarks") or s.get("address") or ("Сервер %d" % (i + 1))
+            remark = s.get("remarks") or s.get("address") or ("Server %d" % (i + 1))
             code = flag_code(remark)
             row = _ClickFrame(lambda e=None, p=i: self._select_server_idx(p))
             row.setObjectName("serverCard")
@@ -1715,7 +1715,7 @@ class MainWindow(QMainWindow):
                 fl.setStyleSheet("color:#33333D; font-size:14px;")
             fl.setFixedWidth(36)
             hl.addWidget(fl)
-            head = re.sub(r"^\[[A-Za-z0-9]{2,4}\]\s*", "", strip_flags(remark).strip()) or ("Сервер %d" % (i + 1))
+            head = re.sub(r"^\[[A-Za-z0-9]{2,4}\]\s*", "", strip_flags(remark).strip()) or ("Server %d" % (i + 1))
             active = bool(self.active_addr) and s.get("address") == self.active_addr
             if active:
                 head += "  ●"
@@ -1749,7 +1749,7 @@ class MainWindow(QMainWindow):
         ms = self.lats.get(i)
         if ms is not None and ms >= 0:
             color = "#4ADE80" if ms < 120 else ("#F5A623" if ms < 300 else "#E5484D")
-            lbl.setText('<span style="color:%s">%d мс</span>' % (color, ms))
+            lbl.setText('<span style="color:%s">%d ms</span>' % (color, ms))
         elif ms == -1:
             lbl.setText('<span style="color:#E5484D">✗</span>')
         else:
@@ -1781,7 +1781,7 @@ class MainWindow(QMainWindow):
 
     def _select_server_idx(self, idx):
         if not (0 <= idx < len(self.servers)):
-            self.statusBar().showMessage("Неверный сервер", 5000)
+            self.statusBar().showMessage("Bad server", 5000)
             return
         self._request_op("server", idx)
 
@@ -1803,10 +1803,10 @@ class MainWindow(QMainWindow):
         # legacy QListWidget removed — grid uses direct _select_server_idx on card click
         # keep btn compat: pick active or 0
         if self._op_in_progress:
-            self.statusBar().showMessage("Операция уже выполняется — подождите…", 4000)
+            self.statusBar().showMessage("Op already running — wait…", 4000)
             return
         if not self.servers:
-            self.statusBar().showMessage("Нет серверов", 5000)
+            self.statusBar().showMessage("No servers", 5000)
             return
         idx = 0
         if self.active_addr:
@@ -1820,11 +1820,11 @@ class MainWindow(QMainWindow):
         self._op_in_progress = False
         self._settle_until = time.monotonic() + 5
         if ok:
-            self.statusBar().showMessage("Сервер переключён", 4000)
+            self.statusBar().showMessage("Server switched", 4000)
             self.refresh_active_server()
             self.render_servers()
         else:
-            self.statusBar().showMessage("Ошибка: %s" % (out or "?"), 8000)
+            self.statusBar().showMessage("Error: %s" % (out or "?"), 8000)
             self.pill.set_state(self.state or "OFF")
         self.poll_status()
         self._drain_pending()
@@ -1837,7 +1837,7 @@ class MainWindow(QMainWindow):
     def save_sub(self):
         err = save_sub_url(self.sub_url.text())
         self.statusBar().showMessage(
-            "Ссылка сохранена — игровой режим подхватит её сам" if not err else err, 6000)
+            "Link saved — game mode picks it up automatically" if not err else err, 6000)
 
     def _sub_script(self, fetch_body):
         url, _, raw = converter_consts()
@@ -1868,16 +1868,16 @@ class MainWindow(QMainWindow):
     def refresh_sub(self):
         script, url = self._sub_script(fetch_body=True)
         if not script:
-            self.statusBar().showMessage("URL подписки не найден", 6000)
+            self.statusBar().showMessage("Subscription URL missing", 6000)
             return
-        self.statusBar().showMessage("Обновление подписки…")
+        self.statusBar().showMessage("Refreshing subscription…")
         for b in getattr(self, "_refresh_btns", []):
             try:
                 b.setEnabled(False)
             except RuntimeError:
                 pass
         try:
-            self.sub_updated.setText("Обновление…")
+            self.sub_updated.setText("Refreshing…")
         except RuntimeError:
             pass
         w = CmdWorker(script, 45)
@@ -1968,7 +1968,7 @@ class MainWindow(QMainWindow):
     def _sub_failed(self, err):
         self._refresh_restore()
         self.statusBar().showMessage(
-            "Ошибка подписки: " + (err[-120:] if err else "?"), 8000)
+            "Subscription error: " + (err[-120:] if err else "?"), 8000)
 
     def _sub_clear(self):
         self.sub_progress.setValue(0)
@@ -1977,11 +1977,11 @@ class MainWindow(QMainWindow):
 
     def _sub_cache_or_reason(self, out, line):
         if not (out or "").strip():
-            reason = "Нет ответа сети"
+            reason = "No network reply"
         elif not line:
-            reason = "Нет userinfo в ответе"
+            reason = "No userinfo in reply"
         else:
-            reason = "Пустая квота (total=0)"
+            reason = "Empty quota (total=0)"
         try:
             with open(os.path.join(STATE_DIR, "sub-cache.json")) as f:
                 c = json.load(f)
@@ -2006,7 +2006,7 @@ class MainWindow(QMainWindow):
             reason, cached = self._sub_cache_or_reason(out, line)
             if cached:
                 self.sub_progress.setValue(cached[0])
-                self.sub_used.setText(cached[1] + " (кэш)")
+                self.sub_used.setText(cached[1] + " (cached)")
                 self.sub_expire.setText(cached[2])
             else:
                 self.sub_progress.setValue(0)
@@ -2021,9 +2021,9 @@ class MainWindow(QMainWindow):
     def _sub_loaded_full(self, out):
         self._refresh_restore()
         self._apply_sub_info(out)
-        self.sub_updated.setText("Обновлено: " + time.strftime("%d.%m %H:%M"))
+        self.sub_updated.setText("Updated: " + time.strftime("%d.%m %H:%M"))
         self.reload_servers()
-        self.statusBar().showMessage("Подписка обновлена", 6000)
+        self.statusBar().showMessage("Subscription refreshed", 6000)
 
     def _setup_tray(self):
         try:
@@ -2044,7 +2044,7 @@ class MainWindow(QMainWindow):
         self.tray.setIcon(icon if not icon.isNull() else QIcon.fromTheme("network-vpn"))
         self.tray.setToolTip("Neodon VPN")
         menu = QMenu()
-        act_show = menu.addAction("Показать")
+        act_show = menu.addAction("Show")
         act_show.triggered.connect(self._tray_show)
         menu.addSeparator()
         act_proxy = menu.addAction("PROXY")
@@ -2052,7 +2052,7 @@ class MainWindow(QMainWindow):
         act_tunnel = menu.addAction("TUNNEL")
         act_tunnel.triggered.connect(lambda: self.set_mode("full", restart=True))
         menu.addSeparator()
-        act_quit = menu.addAction("Выход")
+        act_quit = menu.addAction("Quit")
         act_quit.triggered.connect(self._tray_quit)
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(self._tray_activated)
@@ -2103,7 +2103,7 @@ class MainWindow(QMainWindow):
             if getattr(self, "_tray_first_hide", False):
                 self._tray_first_hide = False
                 try:
-                    self.tray.showMessage("Neodon VPN", "Скрыт в трей возле часов — клик по иконке чтобы вернуть", QSystemTrayIcon.MessageIcon.Information, 3000)
+                    self.tray.showMessage("Neodon VPN", "Hidden to tray by the clock — click the icon to restore", QSystemTrayIcon.MessageIcon.Information, 3000)
                 except Exception:
                     pass
             return
@@ -2173,9 +2173,9 @@ class _AppsPage(QWidget):
             return
         w = CmdWorker("python3 %s" % HELPER, 30)
         w.ok.connect(lambda out: self.win.statusBar().showMessage(
-            "Правила применены: " + (out.splitlines()[-1] if out else "OK"), 6000))
+            "Rules applied: " + (out.splitlines()[-1] if out else "OK"), 6000))
         w.fail.connect(lambda err: self.win.statusBar().showMessage(
-            "Ошибка правил: " + (err[-160:] if err else "?"), 8000))
+            "Rules error: " + (err[-160:] if err else "?"), 8000))
         w.start()
         self.win._workers.append(w)
 
