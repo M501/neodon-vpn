@@ -84,12 +84,13 @@ dry "copy config examples only if absent" || {
   chmod 600 "$HOME"/AI/singbox/*.json 2>/dev/null || true
 }
 
-# 2. systemd user units (vpn must survive reboots; GUI stays manual)
+# 2. systemd user units (manual power only: units installed DISABLED, never enabled)
 if ls "$SRC"/systemd/*.service >/dev/null 2>&1; then
-  dry "install user units + daemon-reload" || {
+  dry "install user units + daemon-reload + disable autostart" || {
     mkdir -p ~/.config/systemd/user
     cp "$SRC"/systemd/*.service ~/.config/systemd/user/
     systemctl --user daemon-reload
+    systemctl --user disable neodon-boot.service sing-box.service sing-box-full.service sing-box-proxy.service 2>/dev/null || true
   }
 fi
 if ! loginctl show-user "$USER" 2>/dev/null | grep -q "Linger=yes"; then

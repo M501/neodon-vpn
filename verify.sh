@@ -21,6 +21,8 @@ ls ~/.config/systemd/user/sing-box*.service >/dev/null 2>&1 \
   && ok "sing-box units present" || bad "sing-box units missing"
 [ "$(systemctl --user is-enabled sing-box.service 2>/dev/null)" = "disabled" ] \
   && [ "$(systemctl --user is-enabled sing-box-full.service 2>/dev/null)" = "disabled" ] \
+  && [ "$(systemctl --user is-enabled sing-box-proxy.service 2>/dev/null)" != "enabled" ] \
+  && [ "$(systemctl --user is-enabled neodon-boot.service 2>/dev/null)" != "enabled" ] \
   && ok "no autostart (default OFF)" || bad "autostart ENABLED (must be off)"
 [ -d ~/homebrew/plugins/neodon-vpn ] \
   && ok "decky plugin present" || warn "decky plugin absent (optional)"
