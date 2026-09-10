@@ -33,6 +33,7 @@ async def main():
     import os
     import re
     app_path = os.environ.get("NEODON_APP", "/home/m26/AI/neodon-vpn/neodon-vpn.py")
+    blk = ""
     try:
         src = open(app_path, encoding="utf-8").read()
         blk = src.split("PRESETS = [", 1)[1].split("\n]\n", 1)[0]
@@ -40,6 +41,14 @@ async def main():
     except (OSError, IndexError):
         ids = set()
     check("preset-names-cover-desktop", ids != set() and set(m.PRESET_NAMES) >= ids)
+    # rule names are proper nouns: backend map must equal desktop names verbatim
+    try:
+        pairs = re.findall(r'^\s*\("([a-z0-9-]+)",\s*"([^"]+)"', blk, re.M)
+        desk_names = {k: v for k, v in pairs if k in ids}
+    except (OSError, IndexError):
+        desk_names = {}
+    check("preset-names-verbatim",
+          desk_names != {} and all(m.PRESET_NAMES.get(k) == v for k, v in desk_names.items()))
     check("quota-shape", isinstance(await m.get_quota(), dict))
     # nothing must have been mutated: mode file untouched, no workers spawned
     print("FAILURES:", fails if fails else "none")

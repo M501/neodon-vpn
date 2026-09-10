@@ -31,16 +31,16 @@ CONVERTER = os.path.join(HOME, "AI", "neodon-sub", "neodon-sub.py")
 MODES = ("smart", "full")
 ID_RE = re.compile(r"^[0-9]+$")
 
-# Desktop preset display names (English, mirrors PRESETS in neodon-vpn.py).
+# Desktop preset display names, VERBATIM (proper nouns — never translated).
 # Game panel shows these so both UIs call rules by the same names.
 PRESET_NAMES = {
     "default": "Default",
-    "ru-bez-vpn": ".RU without VPN",
+    "ru-bez-vpn": ".RU без VPN",
     "popular-ai": "Popular AI",
     "social-networks": "Social Networks",
-    "only-unavailable": "Blocked-only",
-    "socseti-vpn": "Social via VPN",
-    "basic-set": "Basic Set",
+    "only-unavailable": "Только недоступные ресурсы",
+    "socseti-vpn": "Соцсети через впн",
+    "basic-set": "Базовый набор",
 }
 USERINFO_RE = re.compile(r"upload=(\d+);\s*download=(\d+);\s*total=(\d+);\s*expire=(\d+)")
 
