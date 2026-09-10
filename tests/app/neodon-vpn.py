@@ -384,6 +384,32 @@ def load_servers():
     return out
 
 
+def save_sub_url(url, path=None):
+    """Validate + persist the subscription URL.
+
+    Single source of truth: desktop Settings writes it here, game-mode
+    refresh reads the same file. Returns "" on success, error text otherwise.
+    """
+    url = (url or "").strip()
+    if not re.match(r"^https?://\S+$", url):
+        return "URL должен начинаться с http(s)://"
+    p = path or CONVERTER
+    try:
+        src = open(p, encoding="utf-8", errors="replace").read()
+    except OSError:
+        src = ""
+    if re.search(r"^\s*URL\s*=", src, re.M):
+        src = re.sub(r"^\s*URL\s*=.*$", "URL='%s'" % url, src, count=1, flags=re.M)
+    else:
+        src = "URL='%s'\n" % url + src
+    os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+    tmp = p + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(src)
+    os.replace(tmp, p)
+    return ""
+
+
 def current_mode():
     cmd = host_cmd("neodon-hostctl status") if SANDBOX else "bash %s status" % TOGGLE
     rc, out, err = run_cmd(cmd, timeout=10)
@@ -1166,17 +1192,20 @@ class MainWindow(QMainWindow):
         sc, sl = self._card(bl, "SUBSCRIPTION")
         url, _, _ = converter_consts()
         self.sub_url = QLineEdit(url or "")
-        self.sub_url.setReadOnly(True)
+        self.sub_url.setPlaceholderText("https://… — ссылка от VPN-провайдера")
         sl.addWidget(self.sub_url)
         srow = QHBoxLayout()
         self.sub_updated = QLabel("Обновлено: —")
         self.sub_updated.setObjectName("muted")
+        save = QPushButton("Сохранить ссылку")
+        save.clicked.connect(self.save_sub)
         ref = QPushButton("Обновить подписку")
         ref.setObjectName("accent")
         ref.clicked.connect(self.refresh_sub)
         self._refresh_btns = getattr(self, "_refresh_btns", []) + [ref]
         srow.addWidget(self.sub_updated)
         srow.addStretch()
+        srow.addWidget(save)
         srow.addWidget(ref)
         sl.addLayout(srow)
 
@@ -1805,6 +1834,11 @@ class MainWindow(QMainWindow):
         pass
 
     # ---- подписка ----
+    def save_sub(self):
+        err = save_sub_url(self.sub_url.text())
+        self.statusBar().showMessage(
+            "Ссылка сохранена — игровой режим подхватит её сам" if not err else err, 6000)
+
     def _sub_script(self, fetch_body):
         url, _, raw = converter_consts()
         if not url:

@@ -23,6 +23,7 @@ function Content() {
   const [servers, setServers] = useState<DropdownOption[]>([]);
   const [srvIdx, setSrvIdx] = useState<number>(0);
   const [quota, setQuota] = useState<string>("");
+  const [profile, setProfile] = useState<string>("");
 
   async function refresh() {
     try {
@@ -34,6 +35,7 @@ function Content() {
       setMode(dm === "full" ? "full" : "smart");
       const ip: string = st?.exit_ip || "—";
       setMeta(actual + " · " + ip);
+      setProfile(st?.profile || "");
       const sv: any = un(await call("get_servers"));
       const list: any[] = sv?.servers || [];
       const active: string = sv?.active || "";
@@ -66,10 +68,16 @@ function Content() {
     setTimeout(refresh, 1200);
   }
 
-  async function switchServer(i: number) {
-    await call("set_server", i);
+  async function stepServer(d: number) {
+    if (servers.length === 0) return;
+    const next: number = (srvIdx + d + servers.length) % servers.length;
+    setSrvIdx(next);
+    await call("set_server", next);
     setTimeout(refresh, 1500);
   }
+
+  const curLabel: string =
+    servers.length > 0 ? String(servers[srvIdx]?.label || ("Сервер " + (srvIdx + 1))) : "…";
 
   return (
     <PanelSection title="Neodon VPN">
@@ -88,12 +96,13 @@ function Content() {
         onChange={(v: any) => switchMode((v?.data as Mode) || "smart")}
         strDefaultLabel="Режим"
       />
-      <Dropdown
-        rgOptions={servers}
-        selectedOption={srvIdx}
-        onChange={(v: any) => switchServer(Number(v?.data ?? 0))}
-        strDefaultLabel="Сервер"
-      />
+      <div>{curLabel} ({servers.length > 0 ? srvIdx + 1 : 0}/{servers.length})</div>
+      <ButtonItem layout="below" onClick={() => stepServer(-1)}>
+        ◀ Предыдущий сервер
+      </ButtonItem>
+      <ButtonItem layout="below" onClick={() => stepServer(1)}>
+        Следующий сервер ▶
+      </ButtonItem>
       <ButtonItem layout="below" onClick={async () => {
         setMeta("обновление подписки…");
         await call("refresh_sub");
@@ -102,6 +111,7 @@ function Content() {
         Обновить (серверы + трафик)
       </ButtonItem>
       {quota !== "" && <div>Трафик: {quota}</div>}
+      {profile !== "" && <div>Профиль: {profile} (как в десктопе)</div>}
     </PanelSection>
   );
 }

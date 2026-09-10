@@ -672,3 +672,16 @@ def test_traffic_cards_render(monkeypatch, tmp_path):
     out = str(tmp_path / "traffic.png")
     assert win.pages["traffic"].grab().save(out), "grab failed"
     print("TRAFFIC-PNG:" + out)
+
+
+def test_save_sub_url_roundtrip(monkeypatch, tmp_path):
+    m = app()
+    p = str(tmp_path / "neodon-sub.py")
+    assert m.save_sub_url("https://example.com/sub", p) == ""
+    monkeypatch.setattr(m, "CONVERTER", p)
+    url, _, _ = m.converter_consts()
+    assert url == "https://example.com/sub"
+    assert m.save_sub_url("https://other.example/x", p) == ""
+    assert m.converter_consts()[0] == "https://other.example/x"
+    assert m.save_sub_url("ftp://x", p) != ""
+    assert m.save_sub_url("", p) != ""
