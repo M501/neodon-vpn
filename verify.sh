@@ -19,6 +19,9 @@ sudo -n test -f /etc/sudoers.d/neodon-vpn 2>/dev/null \
   || warn "no sudoers file (manual sudo steps)"
 ls ~/.config/systemd/user/sing-box*.service >/dev/null 2>&1 \
   && ok "sing-box units present" || bad "sing-box units missing"
+[ "$(systemctl --user is-enabled sing-box.service 2>/dev/null)" = "disabled" ] \
+  && [ "$(systemctl --user is-enabled sing-box-full.service 2>/dev/null)" = "disabled" ] \
+  && ok "no autostart (default OFF)" || bad "autostart ENABLED (must be off)"
 [ -d ~/homebrew/plugins/neodon-vpn ] \
   && ok "decky plugin present" || warn "decky plugin absent (optional)"
 command -v steamos-add-to-steam >/dev/null 2>&1 \
