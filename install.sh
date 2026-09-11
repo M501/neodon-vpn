@@ -4,7 +4,7 @@
 # Usage: bash install.sh [--dry-run] [--uninstall] [--help] [--version]
 set -euo pipefail
 
-VERSION="0.1.0-rc1"
+VERSION="0.1.0"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # tarball layout (bin/) or repo layout (scripts/) — both work
 BIN="$SRC/bin"; [ -d "$BIN" ] || BIN="$SRC/scripts"
@@ -33,9 +33,11 @@ do_uninstall() {
   dry "systemctl --user disable --now sing-box.service sing-box-full.service sing-box-proxy.service" \
     || systemctl --user disable --now sing-box.service sing-box-full.service sing-box-proxy.service 2>/dev/null || true
   dry "rm -rf ~/.local/bin/neodon-* ~/homebrew/plugins/neodon-vpn" \
-    || { rm -f ~/.local/bin/neodon-hostctl ~/.local/bin/neodon-vpn.py; rm -rf ~/homebrew/plugins/neodon-vpn; }
+    || { rm -f ~/.local/bin/neodon-hostctl ~/.local/bin/neodon-vpn.py ~/.local/bin/neodon-gui; rm -rf ~/homebrew/plugins/neodon-vpn; }
   dry "rm -f ~/.local/share/applications/io.neodon.gui.desktop" \
     || rm -f ~/.local/share/applications/io.neodon.gui.desktop
+  dry "rm -f icon" \
+    || rm -f ~/.local/share/icons/hicolor/scalable/apps/io.neodon.gui.svg
   if [ -f /etc/sudoers.d/neodon-vpn ]; then
     log "sudoers file left in place (remove manually): /etc/sudoers.d/neodon-vpn"
   fi
@@ -111,10 +113,16 @@ if [ -f "$SRC/sudoers.d/neodon-vpn.template" ]; then
   fi
 fi
 
-# 4. desktop file + steam shortcut (optional, never fatal)
+# 4. desktop file + launcher + icon + steam shortcut (optional, never fatal)
+dry "install neodon-gui launcher" || {
+  printf '#!/bin/sh\nexec /usr/bin/python3 "$HOME/AI/neodon-vpn/neodon-vpn.py" "$@"\n' > "$HOME/.local/bin/neodon-gui"
+  chmod 755 "$HOME/.local/bin/neodon-gui"
+}
 if [ -f "$SRC/desktop/io.neodon.gui.desktop" ]; then
-  dry "install desktop file" \
+  dry "install desktop file + icon" \
     || install -Dm644 "$SRC/desktop/io.neodon.gui.desktop" "$HOME/.local/share/applications/io.neodon.gui.desktop"
+  [ -f "$SRC/desktop/io.neodon.gui.svg" ] \
+    && (dry "install icon" || install -Dm644 "$SRC/desktop/io.neodon.gui.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/io.neodon.gui.svg")
 else
   log "desktop file not in package, keeping existing."
 fi
@@ -123,8 +131,8 @@ if command -v steamos-add-to-steam >/dev/null 2>&1; then
     log "steam shortcut already registered, skipping (no duplicates)."
   else
     dry "steamos-add-to-steam desktop file" \
-      || steamos-add-to-steam "$HOME/.local/share/applications/io.neodon.gui.desktop" >/dev/null 2>&1 || true
-    touch ~/.local/share/neodon-steam-shortcut.done 2>/dev/null || true
+      || { steamos-add-to-steam "$HOME/.local/share/applications/io.neodon.gui.desktop" >/dev/null 2>&1 || true; \
+           touch ~/.local/share/neodon-steam-shortcut.done 2>/dev/null || true; }
   fi
 fi
 

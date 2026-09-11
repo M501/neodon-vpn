@@ -1,0 +1,99 @@
+{
+ "rules": [
+  {
+   "action": "sniff"
+  },
+  {
+   "protocol": "dns",
+   "action": "hijack-dns"
+  },
+  {
+   "ip_cidr": [
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "127.0.0.0/8",
+    "169.254.0.0/16",
+    "fc00::/7",
+    "fe80::/10"
+   ],
+   "outbound": "direct"
+  },
+  {
+   "process_name": [
+    "qbittorrent",
+    "steam",
+    "steamwebhelper",
+    "reaper"
+   ],
+   "outbound": "direct"
+  },
+  {
+   "domain_suffix": [
+    "ozon.ru",
+    "ozone.ru",
+    "ozonusercontent.com"
+   ],
+   "outbound": "direct"
+  },
+  {
+   "protocol": "bittorrent",
+   "outbound": "direct"
+  },
+  {
+   "domain_suffix": [
+    "ru",
+    "рф",
+    "xn--p1ai",
+    "su"
+   ],
+   "outbound": "direct"
+  },
+  {
+   "domain_suffix": [
+    "ozon.ru",
+    "ozone.ru",
+    "ozonusercontent.com",
+    "owa.ozon.ru",
+    "learning.ozon.ru",
+    "mapi.learning.ozon.ru",
+    "ws.seller.ozon.ru",
+    "bank.ozon.ru",
+    "seller.ozon.ru",
+    "pay.ozon.ru",
+    "securepay.ozon.ru",
+    "adv.ozon.ru",
+    "invest.ozon.ru",
+    "ord.ozon.ru",
+    "autodiscover.ord.ozon.ru",
+    "st.ozone.ru",
+    "ir.ozone.ru",
+    "vt-1.ozone.ru",
+    "www.ozon.ru",
+    "ozon.ru",
+    "xapi.ozon.ru",
+    "ozonusercontent.com",
+    "owa.ozon.ru",
+    "learning.ozon.ru",
+    "mapi.learning.ozon.ru",
+    "ws.seller.ozon.ru",
+    "bank.ozon.ru",
+    "seller.ozon.ru",
+    "pay.ozon.ru",
+    "securepay.ozon.ru",
+    "adv.ozon.ru",
+    "invest.ozon.ru",
+    "ord.ozon.ru",
+    "autodiscover.ord.ozon.ru",
+    "st.ozone.ru",
+    "ir.ozone.ru",
+    "vt-1.ozone.ru",
+    "www.ozon.ru",
+    "ozon.ru",
+    "xapi.ozon.ru"
+   ],
+   "outbound": "direct"
+  }
+ ],
+ "final": "proxy"
+}

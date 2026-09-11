@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Neodon VPN
+Comment=Neodon VPN client (v2RayTun clone)
+Exec=neodon-gui
+Type=Application
+Categories=Network;
+Icon=io.neodon.gui
+Terminal=false
+StartupWMClass=neodon-vpn.py
+Keywords=vpn;proxy;tunnel;neodon;

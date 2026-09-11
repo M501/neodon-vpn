@@ -2038,7 +2038,7 @@ class MainWindow(QMainWindow):
         self.tray = QSystemTrayIcon(self)
         # use same shield svg as icon, fallback to standard
         try:
-            icon = QIcon("/home/m26/.local/share/icons/hicolor/scalable/apps/io.neodon.gui.svg")
+            icon = QIcon(os.path.expanduser("~/.local/share/icons/hicolor/scalable/apps/io.neodon.gui.svg"))
             if icon.isNull():
                 icon = self.windowIcon() or QIcon.fromTheme("network-vpn")
         except Exception:

@@ -15,7 +15,7 @@ esac
 TRANS_MARKER=~/AI/singbox/.transitioning
 notify() { :; }  # owner 2026-09-08: desktop popup spam off
 set_mode() { echo "$1" > "$MODE_FILE"; }
-wd_reset() { python3 -c 'import json,time;f="/home/m26/AI/singbox/watchdog-state.json";d=json.load(open(f));d.update({"consecutive_failures":0,"backoff_index":0,"next_due_ts":int(time.time()),"watchdog_status":"ok"});json.dump(d,open(f,"w"))'; }
+wd_reset() { python3 -c 'import json,time,os;f=os.path.expanduser("~/AI/singbox/watchdog-state.json");d=json.load(open(f));d.update({"consecutive_failures":0,"backoff_index":0,"next_due_ts":int(time.time()),"watchdog_status":"ok"});json.dump(d,open(f,"w"))'; }
 fw_flush() { bash ~/AI/singbox/killswitch.sh remove >/dev/null 2>&1 || true; }
 stop_all() {
   systemctl --user stop sing-box.service 2>/dev/null
@@ -158,9 +158,9 @@ status-json)
     fi
     PROFILE="$(cat "$HOME/AI/singbox/.profile" 2>/dev/null || echo default)"
     read -r wd_status wd_fails wd_next < <(python3 - <<'EOF' 2>/dev/null
-import json
+import json, os
 try:
-    d = json.load(open('/home/m26/AI/singbox/watchdog-state.json'))
+    d = json.load(open(os.path.expanduser('~/AI/singbox/watchdog-state.json')))
     print(d.get('watchdog_status', ''), d.get('consecutive_failures', 0), d.get('next_due_ts') or d.get('next_retry_ts') or '')
 except Exception:
     print('', 0, '')
@@ -177,11 +177,11 @@ EOF
     else
       rm -f "$TRANS_MARKER"
     fi
-    server_tag=$(python3 -c 'import json;print(json.load(open("/home/m26/AI/singbox/selected-server.json")).get("tag",""))' 2>/dev/null)
+    server_tag=$(python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/AI/singbox/selected-server.json"))).get("tag",""))' 2>/dev/null)
     lat=$(python3 - <<'EOF' 2>/dev/null
-import json, socket, time
+import json, os, socket, time
 try:
-    cfg = json.load(open('/home/m26/AI/singbox/config-full.json'))
+    cfg = json.load(open(os.path.expanduser('~/AI/singbox/config-full.json')))
     p = next((o for o in cfg.get('outbounds', []) if o.get('server')), None)
     if not p:
         raise SystemExit
