@@ -1654,6 +1654,28 @@ class MainWindow(QMainWindow):
                 self.restoreGeometry(bytes.fromhex(g))
         except (OSError, ValueError, RuntimeError):
             pass
+        self._clamp_to_screen()
+
+    def _clamp_to_screen(self):
+        """Keep the window inside the available geometry (excludes panels).
+
+        A stale/foreign geometry (or an external resize) can push the grip
+        under the dock — then the window is unresizable by mouse. Clamping
+        on restore means reopening always repairs it; Alt+RMB resizes live.
+        """
+        try:
+            scr = self.screen() or QApplication.primaryScreen()
+            if scr is None:
+                return
+            avail = scr.availableGeometry()
+            g = self.frameGeometry()
+            w = min(max(g.width(), self.minimumWidth()), avail.width())
+            h = min(max(g.height(), self.minimumHeight()), avail.height())
+            x = min(max(g.x(), avail.x()), avail.x() + avail.width() - w)
+            y = min(max(g.y(), avail.y()), avail.y() + avail.height() - h)
+            self.setGeometry(x, y, w, h)
+        except RuntimeError:
+            pass
 
     def write_gui_state(self):
         path = os.path.join(STATE_DIR, "gui-state.json")

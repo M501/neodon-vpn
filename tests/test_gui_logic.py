@@ -708,3 +708,18 @@ def test_save_sub_url_roundtrip(monkeypatch, tmp_path):
     assert m.converter_consts()[0] == "https://other.example/x"
     assert m.save_sub_url("ftp://x", p) != ""
     assert m.save_sub_url("", p) != ""
+
+
+def test_clamp_to_screen(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    scr = win.screen() or m.QApplication.primaryScreen()
+    avail = scr.availableGeometry()
+    win.setGeometry(avail.x() + 4000, avail.y() + 4000,
+                    avail.width() + 2000, avail.height() + 2000)
+    win._clamp_to_screen()
+    g = win.frameGeometry()
+    assert g.width() <= avail.width() and g.height() <= avail.height()
+    assert g.x() >= avail.x() and g.y() >= avail.y()
+    assert g.x() + g.width() <= avail.x() + avail.width()
+    assert g.y() + g.height() <= avail.y() + avail.height()
