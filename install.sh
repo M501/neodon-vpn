@@ -4,7 +4,7 @@
 # Usage: bash install.sh [--dry-run] [--uninstall] [--no-verify] [--help] [--version]
 set -euo pipefail
 
-VERSION="0.1.2"
+VERSION="0.1.3"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # tarball layout (bin/) or repo layout (scripts/) — both work
 BIN="$SRC/bin"; [ -d "$BIN" ] || BIN="$SRC/scripts"
