@@ -18,6 +18,20 @@
   мёртвый preset_desc. Глиф ⓘ заменён (в шрифтах рисуется «0»).
 - 29/29 pytest + vision-пруф; деплой + рестарт.
 
+## 2026-09-11 (47) — Релиз v0.1.1: sudo-once, Decky-bootstrap, QA triple-pass
+
+- https://github.com/M501/neodon-vpn/releases/tag/v0.1.1 (tarball+sha256).
+- Sudo: passwordless — молча; TTY — один вопрос (sudo -v); headless без
+  кэша — деградация с понятным текстом (открытие: `sudo -v` требует TTY,
+  детект — `sudo -n true` + `[ -t 0]`).
+- Decky нет → официальный installer (URL проверен: 200/3.9КБ), потом
+  наш drop-in; всё warn-never-fail, десктоп работает всегда.
+- QA: A static (манифест/синтаксис/компиляция/секреты), B dry-run на
+  хосте, C реальная установка в фейковый HOME (live untouched) — все OK.
+  По пути поймано: qa-пути для нативного python (cygpath), PySide6 прячется
+  при чужом HOME (PYTHONPATH), старый dry-run трогал steam-маркер,
+  verify в сэндбоксе неприменим (--no-verify).
+
 ## 2026-09-11 (46) — Релиз v0.1.0 на GitHub (скачал → install.sh → вставил ссылку)
 
 - https://github.com/M501/neodon-vpn/releases/tag/v0.1.0 : tarball + sha256.
