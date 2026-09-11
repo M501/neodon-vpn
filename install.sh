@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # Neodon VPN — one-click installer (GitHub Release tarball entry point).
 # Idempotent: re-running repairs instead of duplicating. Never runs the VPN.
-# Usage: bash install.sh [--dry-run] [--uninstall] [--help] [--version]
+# Usage: bash install.sh [--dry-run] [--uninstall] [--no-verify] [--help] [--version]
 set -euo pipefail
 
-VERSION="0.1.0"
+VERSION="0.1.1"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # tarball layout (bin/) or repo layout (scripts/) — both work
 BIN="$SRC/bin"; [ -d "$BIN" ] || BIN="$SRC/scripts"
 GUI_SRC="$SRC/bin/neodon-vpn.py"; [ -f "$GUI_SRC" ] || GUI_SRC="$SRC/tests/app/neodon-vpn.py"
 DRY=0
 DO_UNINSTALL=0
+NO_VERIFY=0
 
 log()  { echo "neodon-install: $*"; }
 dry()  { if [ "$DRY" = 1 ]; then echo "  [dry-run] $*"; return 0; fi; return 1; }
@@ -19,9 +20,10 @@ for a in "$@"; do
   case "$a" in
     --dry-run) DRY=1 ;;
     --uninstall) DO_UNINSTALL=1 ;;
+    --no-verify) NO_VERIFY=1 ;;
     --version) echo "$VERSION"; exit 0 ;;
     --help|-h)
-      echo "Usage: bash install.sh [--dry-run] [--uninstall] [--help] [--version]"; exit 0 ;;
+      echo "Usage: bash install.sh [--dry-run] [--uninstall] [--no-verify] [--help] [--version]"; exit 0 ;;
     *) echo "unknown arg: $a" >&2; exit 2 ;;
   esac
 done
@@ -57,6 +59,22 @@ if [ "$MISSING" = 1 ]; then
   exit 2
 fi
 log "deps OK"
+
+# One sudo ask up front: passwordless stays silent, interactive TTY asks once
+# and sudo caches it; headless without cached sudo degrades gracefully.
+SUDO_OK=0
+if [ "$DRY" = 1 ]; then
+  log "dry-run: would probe sudo once"
+  SUDO_OK=1
+elif sudo -n true 2>/dev/null; then
+  SUDO_OK=1
+  log "sudo OK (passwordless, silent)"
+elif [ -t 0 ] && sudo -v; then
+  SUDO_OK=1
+  log "sudo OK (asked once, cached)"
+else
+  log "no sudo: continuing degraded (sudoers, linger, decky-bootstrap skipped)"
+fi
 
 # 1. files: backend + GUI into ~/AI (live layout), bins into ~/.local/bin
 dry "mkdir -p ~/AI/singbox ~/AI/singbox/profiles ~/AI/neodon-vpn/icons ~/.local/bin ~/.local/share/applications" \
@@ -96,20 +114,24 @@ if ls "$SRC"/systemd/*.service >/dev/null 2>&1; then
   }
 fi
 if ! loginctl show-user "$USER" 2>/dev/null | grep -q "Linger=yes"; then
-  log "enabling linger (needs sudo once):"
-  dry "sudo loginctl enable-linger $USER" || sudo loginctl enable-linger "$USER"
+  if [ "$SUDO_OK" = 1 ]; then
+    log "enabling linger (cached sudo):"
+    dry "sudo loginctl enable-linger $USER" || sudo loginctl enable-linger "$USER"
+  else
+    log "skip linger (no cached sudo): user services may not start before login."
+  fi
 fi
 
 # 3. sudoers allowlist (least privilege for shipped installs)
 if [ -f "$SRC/sudoers.d/neodon-vpn.template" ]; then
-  if sudo -n true 2>/dev/null; then
+  if [ "$SUDO_OK" = 1 ] && sudo -n true 2>/dev/null; then
     dry "install/validate /etc/sudoers.d/neodon-vpn" || {
       sed "s/@USER@/$USER/g" "$SRC/sudoers.d/neodon-vpn.template" | sudo tee /etc/sudoers.d/neodon-vpn >/dev/null
       sudo chmod 440 /etc/sudoers.d/neodon-vpn
       sudo visudo -c || { echo "sudoers INVALID, rolled back" >&2; sudo rm -f /etc/sudoers.d/neodon-vpn; exit 4; }
     }
   else
-    log "skip sudoers (no passwordless sudo): run the sudo steps manually."
+    log "skip sudoers (no cached sudo): killswitch will ask for password at runtime."
   fi
 fi
 
@@ -136,7 +158,23 @@ if command -v steamos-add-to-steam >/dev/null 2>&1; then
   fi
 fi
 
-# 5. decky drop-in (optional, never fatal)
+# 5. decky: bootstrap loader if absent, then drop in our plugin (never fatal)
+DECKY_URL="https://github.com/SteamDeckHomebrew/decky-installer/releases/latest/download/install_release.sh"
+if [ ! -x ~/homebrew/services/PluginLoader ] && [ ! -f ~/homebrew/services/PluginLoader ]; then
+  if [ "$SUDO_OK" = 1 ]; then
+    dry "decky loader absent -> official installer" || {
+      if curl -sL -m 60 -o /tmp/decky-install.sh "$DECKY_URL" && [ -s /tmp/decky-install.sh ]; then
+        log "installing Decky Loader (official installer, needs the cached sudo)..."
+        sh /tmp/decky-install.sh || log "decky installer failed: desktop works, game panel needs manual Decky install."
+        rm -f /tmp/decky-install.sh
+      else
+        log "decky installer not downloadable (offline?): desktop works, game panel needs manual Decky install."
+      fi
+    }
+  else
+    log "decky loader absent + no sudo: desktop works, install Decky manually for the game panel."
+  fi
+fi
 if [ -d ~/homebrew/plugins ] && [ -d "$SRC/decky/neodon-vpn" ]; then
   dry "decky plugin drop-in" || cp -r "$SRC/decky/neodon-vpn" ~/homebrew/plugins/
 else
@@ -144,4 +182,8 @@ else
 fi
 
 log "running verify..."
-dry "bash $SRC/verify.sh" || bash "$SRC/verify.sh"
+if [ "$NO_VERIFY" = 1 ]; then
+  log "verify skipped (--no-verify)"
+else
+  dry "bash $SRC/verify.sh" || bash "$SRC/verify.sh"
+fi
