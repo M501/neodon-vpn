@@ -18,6 +18,13 @@
   мёртвый preset_desc. Глиф ⓘ заменён (в шрифтах рисуется «0»).
 - 29/29 pytest + vision-пруф; деплой + рестарт.
 
+## 2026-09-11 (48) — Релиз v0.1.2: видимый прогресс установки
+
+- https://github.com/M501/neodon-vpn/releases/tag/v0.1.2
+- Счётчик [1/7]–[7/7] на каждый этап; скачивание Decky — с прогресс-баром
+  на TTY (тихо без TTY); финальная сводка NEXT-steps в конце.
+- QA triple-pass снова зелёный (static/dry/sandbox).
+
 ## 2026-09-11 (47) — Релиз v0.1.1: sudo-once, Decky-bootstrap, QA triple-pass
 
 - https://github.com/M501/neodon-vpn/releases/tag/v0.1.1 (tarball+sha256).

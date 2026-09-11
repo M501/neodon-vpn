@@ -4,7 +4,7 @@
 # Usage: bash install.sh [--dry-run] [--uninstall] [--no-verify] [--help] [--version]
 set -euo pipefail
 
-VERSION="0.1.1"
+VERSION="0.1.2"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # tarball layout (bin/) or repo layout (scripts/) — both work
 BIN="$SRC/bin"; [ -d "$BIN" ] || BIN="$SRC/scripts"
@@ -15,6 +15,13 @@ NO_VERIFY=0
 
 log()  { echo "neodon-install: $*"; }
 dry()  { if [ "$DRY" = 1 ]; then echo "  [dry-run] $*"; return 0; fi; return 1; }
+STEP=0
+step() { STEP=$((STEP + 1)); log "[$STEP/7] $*"; }
+# curl with a progress bar on TTY, silent otherwise (no dead silence on downloads)
+fetch() {
+  if [ -t 1 ]; then curl -#L -m 60 -o "$1" "$2";
+  else curl -sL -m 60 -o "$1" "$2"; fi
+}
 
 for a in "$@"; do
   case "$a" in
@@ -49,6 +56,7 @@ do_uninstall() {
 if [ "$DO_UNINSTALL" = 1 ]; then do_uninstall; exit 0; fi
 
 log "Neodon VPN $VERSION (dry-run=$DRY)"
+step "checking dependencies"
 MISSING=0
 for dep in python3 sing-box firewall-cmd systemctl; do
   need "$dep" || MISSING=1
@@ -77,6 +85,7 @@ else
 fi
 
 # 1. files: backend + GUI into ~/AI (live layout), bins into ~/.local/bin
+step "installing files"
 dry "mkdir -p ~/AI/singbox ~/AI/singbox/profiles ~/AI/neodon-vpn/icons ~/.local/bin ~/.local/share/applications" \
   || mkdir -p ~/AI/singbox ~/AI/singbox/profiles ~/AI/neodon-vpn/icons ~/.local/bin ~/.local/share/applications
 for f in singbox-toggle.sh singbox-server.sh killswitch.sh dns-fix.sh apply-profile.py; do
@@ -105,6 +114,7 @@ dry "copy config examples only if absent" || {
 }
 
 # 2. systemd user units (manual power only: units installed DISABLED, never enabled)
+step "installing services (staying OFF)"
 if ls "$SRC"/systemd/*.service >/dev/null 2>&1; then
   dry "install user units + daemon-reload + disable autostart" || {
     mkdir -p ~/.config/systemd/user
@@ -123,6 +133,7 @@ if ! loginctl show-user "$USER" 2>/dev/null | grep -q "Linger=yes"; then
 fi
 
 # 3. sudoers allowlist (least privilege for shipped installs)
+step "sudo permissions (one-time)"
 if [ -f "$SRC/sudoers.d/neodon-vpn.template" ]; then
   if [ "$SUDO_OK" = 1 ] && sudo -n true 2>/dev/null; then
     dry "install/validate /etc/sudoers.d/neodon-vpn" || {
@@ -136,6 +147,7 @@ if [ -f "$SRC/sudoers.d/neodon-vpn.template" ]; then
 fi
 
 # 4. desktop file + launcher + icon + steam shortcut (optional, never fatal)
+step "desktop shortcut"
 dry "install neodon-gui launcher" || {
   printf '#!/bin/sh\nexec /usr/bin/python3 "$HOME/AI/neodon-vpn/neodon-vpn.py" "$@"\n' > "$HOME/.local/bin/neodon-gui"
   chmod 755 "$HOME/.local/bin/neodon-gui"
@@ -159,11 +171,12 @@ if command -v steamos-add-to-steam >/dev/null 2>&1; then
 fi
 
 # 5. decky: bootstrap loader if absent, then drop in our plugin (never fatal)
+step "game-mode panel"
 DECKY_URL="https://github.com/SteamDeckHomebrew/decky-installer/releases/latest/download/install_release.sh"
 if [ ! -x ~/homebrew/services/PluginLoader ] && [ ! -f ~/homebrew/services/PluginLoader ]; then
   if [ "$SUDO_OK" = 1 ]; then
     dry "decky loader absent -> official installer" || {
-      if curl -sL -m 60 -o /tmp/decky-install.sh "$DECKY_URL" && [ -s /tmp/decky-install.sh ]; then
+      if fetch /tmp/decky-install.sh "$DECKY_URL" && [ -s /tmp/decky-install.sh ]; then
         log "installing Decky Loader (official installer, needs the cached sudo)..."
         sh /tmp/decky-install.sh || log "decky installer failed: desktop works, game panel needs manual Decky install."
         rm -f /tmp/decky-install.sh
@@ -187,3 +200,6 @@ if [ "$NO_VERIFY" = 1 ]; then
 else
   dry "bash $SRC/verify.sh" || bash "$SRC/verify.sh"
 fi
+step "done"
+echo "neodon-install: NEXT: open Neodon VPN (desktop) -> Settings -> paste provider URL -> Refresh subscription."
+echo "neodon-install: game panel appears in Decky QAM after restarting Steam."
