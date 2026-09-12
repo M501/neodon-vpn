@@ -34,6 +34,11 @@ function Content() {
   const [srvIdx, setSrvIdx] = useState<number>(0);
   const [quota, setQuota] = useState<string>("");
   const [rulesName, setRulesName] = useState<string>("");
+  // Last rendered switch position (echo guard) + last commanded intent.
+  // Steam re-fires onChange when a poll flips `checked` mid-transition
+  // (off at 1s -> poll still CONNECTED -> checked true -> phantom vpn_up).
+  const seenRef = useRef<boolean>(false);
+  const wantRef = useRef<{ v: boolean; ts: number } | null>(null);
 
   async function refresh() {
     try {
@@ -41,6 +46,14 @@ function Content() {
       const ok: boolean = !!st?.ok;
       const actual: string = st?.actual_state || "?";
       const nowOn: boolean = ok && actual === "CONNECTED";
+      // Quiet window: while our own command is in flight, keep showing the
+      // commanded position instead of flapping with half-done backend truth.
+      const quiet: boolean =
+        wantRef.current !== null && Date.now() - wantRef.current.ts < 8000;
+      if (!quiet) {
+        setOn(nowOn);
+        seenRef.current = nowOn;
+      }
       // Honest clock: backend systemd timestamp wins (survives panel
       // reopen); local arming is the fallback. Cleared on drop.
       if (nowOn) {
@@ -83,8 +96,16 @@ function Content() {
   }, []);
 
   async function power(next: boolean) {
+    wantRef.current = { v: next, ts: Date.now() };
     await call(next ? "vpn_up" : "vpn_down");
     setTimeout(refresh, 1200);
+  }
+
+  function onToggle(v: boolean) {
+    // No-op echoes (Steam re-firing on a prop flip) must never reach backend.
+    if (v === seenRef.current) return;
+    seenRef.current = v;
+    power(v);
   }
 
   async function switchMode(m: Mode) {
@@ -107,7 +128,7 @@ function Content() {
           ? "VPN · " + fmtUptime(Math.floor((Date.now() - sinceRef.current) / 1000))
           : "VPN"}
         checked={on}
-        onChange={(v: boolean) => power(v)}
+        onChange={(v: boolean) => onToggle(v)}
       />
       <Dropdown
         rgOptions={[

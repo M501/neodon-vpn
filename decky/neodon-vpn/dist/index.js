@@ -102,12 +102,24 @@ function Content() {
     const [srvIdx, setSrvIdx] = SP_REACT.useState(0);
     const [quota, setQuota] = SP_REACT.useState("");
     const [rulesName, setRulesName] = SP_REACT.useState("");
+    // Last rendered switch position (echo guard) + last commanded intent.
+    // Steam re-fires onChange when a poll flips `checked` mid-transition
+    // (off at 1s -> poll still CONNECTED -> checked true -> phantom vpn_up).
+    const seenRef = SP_REACT.useRef(false);
+    const wantRef = SP_REACT.useRef(null);
     async function refresh() {
         try {
             const st = un(await call("get_status"));
             const ok = !!st?.ok;
             const actual = st?.actual_state || "?";
             const nowOn = ok && actual === "CONNECTED";
+            // Quiet window: while our own command is in flight, keep showing the
+            // commanded position instead of flapping with half-done backend truth.
+            const quiet = wantRef.current !== null && Date.now() - wantRef.current.ts < 8000;
+            if (!quiet) {
+                setOn(nowOn);
+                seenRef.current = nowOn;
+            }
             // Honest clock: backend systemd timestamp wins (survives panel
             // reopen); local arming is the fallback. Cleared on drop.
             if (nowOn) {
@@ -149,8 +161,16 @@ function Content() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     async function power(next) {
+        wantRef.current = { v: next, ts: Date.now() };
         await call(next ? "vpn_up" : "vpn_down");
         setTimeout(refresh, 1200);
+    }
+    function onToggle(v) {
+        // No-op echoes (Steam re-firing on a prop flip) must never reach backend.
+        if (v === seenRef.current)
+            return;
+        seenRef.current = v;
+        power(v);
     }
     async function switchMode(m) {
         await call("set_mode", m);
@@ -165,7 +185,7 @@ function Content() {
     }
     return (SP_JSX.jsxs(DFL.PanelSection, { title: "Neodon VPN", children: [SP_JSX.jsxs("div", { children: ["Status: ", on ? "● On" : "○ Off", " (", meta, ")"] }), SP_JSX.jsx(DFL.ToggleField, { label: on && sinceRef.current
                     ? "VPN · " + fmtUptime(Math.floor((Date.now() - sinceRef.current) / 1000))
-                    : "VPN", checked: on, onChange: (v) => power(v) }), SP_JSX.jsx(DFL.Dropdown, { rgOptions: [
+                    : "VPN", checked: on, onChange: (v) => onToggle(v) }), SP_JSX.jsx(DFL.Dropdown, { rgOptions: [
                     { data: "smart", label: "PROXY" },
                     { data: "full", label: "TUNNEL" },
                 ], selectedOption: mode, onChange: (v) => switchMode(v?.data || "smart"), strDefaultLabel: "Mode" }), SP_JSX.jsx(DFL.Dropdown, { rgOptions: servers, selectedOption: srvIdx, onChange: (v) => switchServer(Number(v?.data ?? 0)), strDefaultLabel: "Server" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: async () => {

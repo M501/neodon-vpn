@@ -14,6 +14,15 @@ if (/\bserverAPI\b/.test(src)) {
   process.exit(1);
 }
 console.log("ok   static-no-serverAPI");
+// 0b. Echo guard: toggle must go through the seen/want refs, never raw.
+// (Phantom vpn_up 2s after vpn_down: Steam re-fires onChange on prop flips.)
+for (const pat of ["seenRef", "wantRef", "v === seenRef.current"]) {
+  if (!src.includes(pat)) {
+    console.log("FAIL static-no-echo-guard", pat);
+    process.exit(1);
+  }
+}
+console.log("ok   static-echo-guard");
 
 const calls = [];
 let connectArgs = null;
