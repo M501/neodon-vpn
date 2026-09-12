@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Install Neodon VPN
+Comment=One-click setup: VPN client for desktop and game mode
+Exec=bash -c "cd \"$(dirname %k)\" && exec bash install.sh"
+Terminal=true
+Type=Application
+Categories=Network;
+Icon=network-vpn
+Keywords=vpn;proxy;neodon;install;

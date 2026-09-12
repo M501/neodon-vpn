@@ -19,6 +19,7 @@ cp "$SRC/tests/app/neodon-vpn.py" "$STAGE/bin/neodon-vpn.py"
 # units / desktop / sudoers / data
 cp "$SRC"/systemd/*.service "$STAGE/systemd/"
 cp "$SRC/desktop/io.neodon.gui.desktop" "$STAGE/desktop/"
+cp "$SRC/desktop/Install Neodon VPN.desktop" "$STAGE/"
 [ -f "$SRC/desktop/io.neodon.gui.svg" ] && cp "$SRC/desktop/io.neodon.gui.svg" "$STAGE/desktop/"
 cp "$SRC/sudoers.d/neodon-vpn.template" "$STAGE/sudoers.d/"
 cp "$SRC"/profiles/*.json "$STAGE/profiles/"

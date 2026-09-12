@@ -15,7 +15,8 @@ for f in install.sh verify.sh \
   bin/apply-profile.py bin/neodon-hostctl bin/neodon-vpn.py \
   systemd/sing-box.service systemd/sing-box-full.service systemd/sing-box-proxy.service \
   desktop/io.neodon.gui.desktop sudoers.d/neodon-vpn.template \
-  decky/neodon-vpn/plugin.json decky/neodon-vpn/main.py decky/neodon-vpn/dist/index.js; do
+  decky/neodon-vpn/plugin.json decky/neodon-vpn/main.py decky/neodon-vpn/dist/index.js \
+  "Install Neodon VPN.desktop" README.md; do
   need "$f"
 done
 [ -n "$(ls "$R"/profiles/*.json 2>/dev/null)" ] && echo "  ok: profiles/*.json" || { echo "  FAIL: profiles empty"; fail=1; }

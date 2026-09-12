@@ -744,3 +744,29 @@ def test_tray_off_restores_default_icon(monkeypatch):
     n1 = len(calls)
     win._sync_tray("OFF")
     assert len(calls) > n1, "OFF must reset the tray icon (flag stuck otherwise)"
+
+
+def test_power_intent_flips_while_busy(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    calls = []
+
+    def fake_toggle(mode):
+        calls.append(mode)
+        win._op_in_progress = True
+        win._target = mode
+
+    monkeypatch.setattr(win, "toggle", fake_toggle)
+    win._settle_until = 0
+    win.connected = False
+    win.state = "OFF"
+    win.mode = "smart"
+    win._op_in_progress = False
+    win._pending = None
+    win._target = None
+    win.on_power()  # idle OFF -> ON runs now
+    assert calls == ["smart"] and win._target == "smart"
+    win.on_power()  # busy, intent ON -> queue OFF (not a second ON)
+    assert win._pending == ("toggle", ("off",)), win._pending
+    win.on_power()  # pending OFF -> flip back to ON
+    assert win._pending == ("toggle", ("smart",)), win._pending

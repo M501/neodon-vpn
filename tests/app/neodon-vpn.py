@@ -734,6 +734,7 @@ class MainWindow(QMainWindow):
         self._last_desired = None
         self._settle_until = 0
         self._pending = None
+        self._target = None
         self._last_preset = None
         self.connected = False
         self.mode = "smart"          # пользовательский: smart (PROXY) | full (TUNNEL)
@@ -1334,16 +1335,26 @@ class MainWindow(QMainWindow):
     def on_power(self):
         try:
             if time.monotonic() < getattr(self, "_settle_until", 0):
-                # double-tap guard: a tap landing right after OFF would
-                # re-enable the VPN and look like "off didn't work"
-                self.statusBar().showMessage("Last op just finished — wait…", 3000)
+                # bounce guard: a second tap right after an op finished would
+                # flip it back before the UI even updated (short window).
+                self.statusBar().showMessage("Last op just finished — wait…", 1500)
                 return
         except RuntimeError:
             pass
-        if self.connected or self.state in ("LOCKED", "FAILED", "DEGRADED"):
-            self._request_op("toggle", "off")
+        # Decide against INTENT (in-flight/queued target), not stale UI state:
+        # pressing OFF 1s after ON must queue OFF, not a second ON.
+        if self._pending:
+            heading = self._pending[1][0]
+        elif self._op_in_progress:
+            heading = getattr(self, "_target", None)
         else:
-            self._request_op("toggle", self.mode)
+            heading = None
+        if heading is None:
+            currently_off = not (self.connected or self.state in ("LOCKED", "FAILED", "DEGRADED"))
+            new = self.mode if currently_off else "off"
+        else:
+            new = self.mode if heading == "off" else "off"
+        self._request_op("toggle", new)
 
     def _request_op(self, kind, *args):
         """Single funnel for user ops: run now, or queue last-wins while busy
@@ -1370,6 +1381,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Op already running — wait…", 4000)
             return
         self._op_in_progress = True
+        self._target = mode
         self._fast_poll_until = time.monotonic() + 12
         try:
             self.set_state("TRANSITIONING")
