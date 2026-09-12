@@ -723,3 +723,24 @@ def test_clamp_to_screen(monkeypatch):
     assert g.x() >= avail.x() and g.y() >= avail.y()
     assert g.x() + g.width() <= avail.x() + avail.width()
     assert g.y() + g.height() <= avail.y() + avail.height()
+
+
+def test_tray_off_restores_default_icon(monkeypatch):
+    m = app()
+    win = _make_win(m, monkeypatch)
+    calls = []
+
+    class FakeTray:
+        def setIcon(self, icon):
+            calls.append(icon)
+
+        def setToolTip(self, t):
+            pass
+
+    win.tray = FakeTray()
+    win.status = {"server_tag": "[PL] X"}
+    win.mode = "smart"
+    win._sync_tray("CONNECTED")
+    n1 = len(calls)
+    win._sync_tray("OFF")
+    assert len(calls) > n1, "OFF must reset the tray icon (flag stuck otherwise)"

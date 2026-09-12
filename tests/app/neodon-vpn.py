@@ -1465,6 +1465,13 @@ class MainWindow(QMainWindow):
                          "FAILED": "network-error"}
                 if s in names and QIcon.hasThemeIcon(names[s]):
                     tray.setIcon(QIcon.fromTheme(names[s]))
+                else:
+                    # OFF and friends: restore the default shield, otherwise
+                    # the last server flag stays stuck in the tray.
+                    dflt = getattr(self, "_tray_default", None)
+                    if dflt is None or dflt.isNull():
+                        dflt = QIcon.fromTheme("network-vpn")
+                    tray.setIcon(dflt)
             try:
                 with open(os.path.join(STATE_DIR, "tray-state.json"), "w") as _f:
                     _f.write(json.dumps({"state": s, "tooltip": "Neodon VPN — %s%s%s" % (human, me, srv),
@@ -2066,6 +2073,7 @@ class MainWindow(QMainWindow):
         except Exception:
             icon = self.windowIcon()
         self.tray.setIcon(icon if not icon.isNull() else QIcon.fromTheme("network-vpn"))
+        self._tray_default = self.tray.icon()
         self.tray.setToolTip("Neodon VPN")
         menu = QMenu()
         act_show = menu.addAction("Show")
