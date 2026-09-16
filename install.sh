@@ -4,7 +4,7 @@
 # Usage: bash install.sh [--dry-run] [--uninstall] [--no-verify] [--help] [--version]
 set -euo pipefail
 
-VERSION="0.1.5"
+VERSION="0.1.6"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # tarball layout (bin/) or repo layout (scripts/) — both work
 BIN="$SRC/bin"; [ -d "$BIN" ] || BIN="$SRC/scripts"
@@ -157,6 +157,9 @@ if [ -f "$SRC/desktop/io.neodon.gui.desktop" ]; then
     || install -Dm644 "$SRC/desktop/io.neodon.gui.desktop" "$HOME/.local/share/applications/io.neodon.gui.desktop"
   [ -f "$SRC/desktop/io.neodon.gui.svg" ] \
     && (dry "install icon" || install -Dm644 "$SRC/desktop/io.neodon.gui.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/io.neodon.gui.svg")
+  # tray indicator on every desktop login (shows state only, never powers VPN)
+  dry "install gui autostart" \
+    || install -Dm644 "$SRC/desktop/io.neodon.gui.desktop" "$HOME/.config/autostart/io.neodon.gui.desktop"
 else
   log "desktop file not in package, keeping existing."
 fi

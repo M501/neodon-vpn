@@ -102,6 +102,8 @@ function Content() {
     const [srvIdx, setSrvIdx] = SP_REACT.useState(0);
     const [quota, setQuota] = SP_REACT.useState("");
     const [rulesName, setRulesName] = SP_REACT.useState("");
+    // Remount starts false: first paint must say Syncing, never stale OFF.
+    const [synced, setSynced] = SP_REACT.useState(false);
     // Last rendered switch position (echo guard) + last commanded intent.
     // Steam re-fires onChange when a poll flips `checked` mid-transition
     // (off at 1s -> poll still CONNECTED -> checked true -> phantom vpn_up).
@@ -109,7 +111,13 @@ function Content() {
     const wantRef = SP_REACT.useRef(null);
     async function refresh() {
         try {
-            const st = un(await call("get_status"));
+            // One round trip, not three: panel syncs in ~1 poll, not ~3.
+            const [sres, svres, qres] = await Promise.all([
+                call("get_status"),
+                call("get_servers"),
+                call("get_quota"),
+            ]);
+            const st = un(sres);
             const ok = !!st?.ok;
             const actual = st?.actual_state || "?";
             const nowOn = ok && actual === "CONNECTED";
@@ -129,13 +137,12 @@ function Content() {
             else {
                 sinceRef.current = 0;
             }
-            setOn(nowOn);
             const dm = st?.desired_mode || "smart";
             setMode(dm === "full" ? "full" : "smart");
             const ip = st?.exit_ip || "—";
             setMeta(actual + " · " + ip);
             setRulesName(st?.profile_name || st?.profile || "");
-            const sv = un(await call("get_servers"));
+            const sv = un(svres);
             const list = sv?.servers || [];
             const active = sv?.active || "";
             setServers(list.map((s, i) => ({ data: i, label: s.remarks || ("Server " + (i + 1)) })));
@@ -143,12 +150,14 @@ function Content() {
             // Never snap back to first on a backend hiccup: keep current idx.
             if (ai >= 0)
                 setSrvIdx(ai);
-            const qq = un(await call("get_quota"))?.quota;
+            const qq = un(qres)?.quota;
             setQuota(qq && qq.used ? String(qq.used) : "");
         }
         catch (e) {
             setMeta("poll error");
         }
+        // First paint must never claim OFF: remount starts false, truth arrives late.
+        setSynced(true);
     }
     SP_REACT.useEffect(() => {
         refresh();
@@ -183,7 +192,7 @@ function Content() {
         await call("set_server", i);
         setTimeout(refresh, 1500);
     }
-    return (SP_JSX.jsxs(DFL.PanelSection, { title: "Neodon VPN", children: [SP_JSX.jsxs("div", { children: ["Status: ", on ? "● On" : "○ Off", " (", meta, ")"] }), SP_JSX.jsx(DFL.ToggleField, { label: on && sinceRef.current
+    return (SP_JSX.jsxs(DFL.PanelSection, { title: "Neodon VPN", children: [SP_JSX.jsx("div", { children: !synced ? "Syncing…" : "Status: " + (on ? "● On" : "○ Off") + " (" + meta + ")" }), SP_JSX.jsx(DFL.ToggleField, { label: on && sinceRef.current
                     ? "VPN · " + fmtUptime(Math.floor((Date.now() - sinceRef.current) / 1000))
                     : "VPN", checked: on, onChange: (v) => onToggle(v) }), SP_JSX.jsx(DFL.Dropdown, { rgOptions: [
                     { data: "smart", label: "PROXY" },

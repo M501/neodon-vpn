@@ -32,6 +32,7 @@ chk "AI/neodon-vpn/neodon-vpn.py"
 chk ".local/bin/neodon-gui"
 chk ".local/bin/neodon-hostctl"
 chk ".local/share/applications/io.neodon.gui.desktop"
+chk ".config/autostart/io.neodon.gui.desktop"
 [ -n "$(ls "$FH"/AI/singbox/profiles/*.json 2>/dev/null)" ] && echo "  ok: profiles" || { echo "  FAIL: profiles"; fail=1; }
 [ -x "$FH/.local/bin/neodon-gui" ] && echo "  ok: launcher executable" || { echo "  FAIL: launcher bit"; fail=1; }
 QT_QPA_PLATFORM=offscreen python3 -c "import ast; ast.parse(open('$FH/AI/neodon-vpn/neodon-vpn.py').read()); print('  ok: gui parses')" || { echo "  FAIL: gui parse"; fail=1; }

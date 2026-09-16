@@ -770,3 +770,16 @@ def test_power_intent_flips_while_busy(monkeypatch):
     assert win._pending == ("toggle", ("off",)), win._pending
     win.on_power()  # pending OFF -> flip back to ON
     assert win._pending == ("toggle", ("smart",)), win._pending
+
+
+def test_epoch_seeds_from_service_start(monkeypatch):
+    import time as _t
+    m = app()
+    assert hasattr(m, "seed_epoch"), "live app must carry seed_epoch"
+    monkeypatch.setattr(m, "active_epoch", lambda: int(_t.time()) - 3600)
+    win = _make_win(m, monkeypatch)
+    win._epoch = None
+    win.set_state("CONNECTED")
+    assert win._epoch is not None
+    age = _t.monotonic() - win._epoch
+    assert 3590 < age < 3610, age

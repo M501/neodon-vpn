@@ -26,6 +26,8 @@ ls ~/.config/systemd/user/sing-box*.service >/dev/null 2>&1 \
   && ok "no autostart (default OFF)" || bad "autostart ENABLED (must be off)"
 [ -d ~/homebrew/plugins/neodon-vpn ] \
   && ok "decky plugin present" || warn "decky plugin absent (optional)"
+[ -f ~/.config/autostart/io.neodon.gui.desktop ] \
+  && ok "gui autostart (tray indicator)" || warn "no gui autostart (no tray after login)"
 command -v steamos-add-to-steam >/dev/null 2>&1 \
   && ok "steam tooling present" || warn "no steamos-add-to-steam (optional)"
 

@@ -34,6 +34,8 @@ function Content() {
   const [srvIdx, setSrvIdx] = useState<number>(0);
   const [quota, setQuota] = useState<string>("");
   const [rulesName, setRulesName] = useState<string>("");
+  // Remount starts false: first paint must say Syncing, never stale OFF.
+  const [synced, setSynced] = useState<boolean>(false);
   // Last rendered switch position (echo guard) + last commanded intent.
   // Steam re-fires onChange when a poll flips `checked` mid-transition
   // (off at 1s -> poll still CONNECTED -> checked true -> phantom vpn_up).
@@ -42,7 +44,13 @@ function Content() {
 
   async function refresh() {
     try {
-      const st: any = un(await call("get_status"));
+      // One round trip, not three: panel syncs in ~1 poll, not ~3.
+      const [sres, svres, qres]: any[] = await Promise.all([
+        call("get_status"),
+        call("get_servers"),
+        call("get_quota"),
+      ]);
+      const st: any = un(sres);
       const ok: boolean = !!st?.ok;
       const actual: string = st?.actual_state || "?";
       const nowOn: boolean = ok && actual === "CONNECTED";
@@ -62,13 +70,12 @@ function Content() {
       } else {
         sinceRef.current = 0;
       }
-      setOn(nowOn);
       const dm: string = st?.desired_mode || "smart";
       setMode(dm === "full" ? "full" : "smart");
       const ip: string = st?.exit_ip || "—";
       setMeta(actual + " · " + ip);
       setRulesName(st?.profile_name || st?.profile || "");
-      const sv: any = un(await call("get_servers"));
+      const sv: any = un(svres);
       const list: any[] = sv?.servers || [];
       const active: string = sv?.active || "";
       setServers(
@@ -77,11 +84,13 @@ function Content() {
       const ai: number = list.findIndex((s: any) => s.address && s.address === active);
       // Never snap back to first on a backend hiccup: keep current idx.
       if (ai >= 0) setSrvIdx(ai);
-      const qq: any = un(await call("get_quota"))?.quota;
+      const qq: any = un(qres)?.quota;
       setQuota(qq && qq.used ? String(qq.used) : "");
     } catch (e) {
       setMeta("poll error");
     }
+    // First paint must never claim OFF: remount starts false, truth arrives late.
+    setSynced(true);
   }
 
   useEffect(() => {
@@ -122,7 +131,7 @@ function Content() {
 
   return (
     <PanelSection title="Neodon VPN">
-      <div>Status: {on ? "● On" : "○ Off"} ({meta})</div>
+      <div>{!synced ? "Syncing…" : "Status: " + (on ? "● On" : "○ Off") + " (" + meta + ")"}</div>
       <ToggleField
         label={on && sinceRef.current
           ? "VPN · " + fmtUptime(Math.floor((Date.now() - sinceRef.current) / 1000))

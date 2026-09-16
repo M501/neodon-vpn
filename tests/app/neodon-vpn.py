@@ -430,6 +430,25 @@ def active_epoch():
     return None
 
 
+def seed_epoch():
+    """Connection-timer base: service start wins over process start.
+
+    Lets the desktop timer (and any GUI relaunch) show the real connection
+    age instead of restarting from zero every process start.
+    ponytail: wall/monotonic math, no timezone parsing.
+    """
+    try:
+        ep = active_epoch()
+    except Exception:
+        ep = None
+    if ep:
+        try:
+            return time.monotonic() - max(0.0, time.time() - ep)
+        except Exception:
+            pass
+    return time.monotonic()
+
+
 _FLAG_EMOJI = {chr(0x1F1E6 + i): chr(0x41 + i) for i in range(26)}
 
 
@@ -1435,7 +1454,7 @@ class MainWindow(QMainWindow):
         self.state = s
         if s == "CONNECTED":
             if getattr(self, "_epoch", None) is None:
-                self._epoch = time.monotonic()
+                self._epoch = seed_epoch()
         else:
             self._epoch = None
             try:
@@ -1595,7 +1614,7 @@ class MainWindow(QMainWindow):
         self.connected = d.get("actual_state") == "CONNECTED"
         if self.state == "CONNECTED":
             if getattr(self, "_epoch", None) is None:
-                self._epoch = time.monotonic()
+                self._epoch = seed_epoch()
         else:
             # streak already counted above; timer clears only at 3 misses
             if self._off_streak >= 3:
