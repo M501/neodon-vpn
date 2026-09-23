@@ -1,0 +1,5 @@
+# Keep bash/scripts LF on every platform: Windows clones (core.autocrlf=true)
+# must not inject CRLF into the release tarball or break shebangs.
+* text=auto eol=lf
+*.png binary
+*.tar.gz binary

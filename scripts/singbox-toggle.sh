@@ -205,7 +205,7 @@ print(json.dumps({
   "tun0": os.environ["TUN"] == "true",
   "exit_ip": os.environ["EXIT_IP"] or None,
   "server_tag": os.environ["SERVER_TAG"] or None,
-  "latency_ms": int(lat) if lat != "null" else None,
+  "latency_ms": int(lat) if lat.strip() not in ("", "null") else None,
   "watchdog_status": os.environ.get("WD_STATUS") or None,
   "consecutive_failures": int(os.environ.get("WD_FAILS") or 0),
   "next_retry": os.environ.get("WD_NEXT") or None

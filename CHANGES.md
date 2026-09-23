@@ -5,6 +5,26 @@
 
 
 
+## 2026-09-23 (55) — CachyOS: инсталлер доведён до [7/7]; sing-box path; регресс toggle
+
+- Жалоба владельца: «инсталлер ничего не устанавливает» (Ally X, свежая CachyOS).
+  Репро: tarball v0.1.6, `bash install.sh` → умер на [6/7] `set -e`:
+  `cp: Permission denied` в ~/homebrew/plugins/neodon-vpn (каталог root-owned
+  после переноса системы) → до verify и `[7/7] done` дело не дошло.
+  Фикс: root-owned drop-in сначала возвращается юзеру (cached sudo), сам drop-in
+  больше не фатален — десктоп работает всегда, панель бонус.
+- Тупик №2: юниты и singbox-server.sh ждут /usr/local/bin/sing-box (Bazzite-путь),
+  на CachyOS пакетный бинарь в /usr/bin → сервис не стартовал вообще.
+  Фикс: инсталлер сам делает симлинк + setcap cap_net_admin,cap_net_raw
+  (иначе user-сервис не поднимет tun0).
+- Регресс, приехавший в v0.1.6: релизный toggle падал ValueError на пустой
+  latency (`int('')` вместо пропуска) → verify «backend status broken».
+  Фикс `.strip() not in ("", "null")` теперь в репо (раньше жил только в live-патче).
+- .gitattributes `* text=auto eol=lf`: Windows-клоны больше не приносят CRLF
+  в bash-скрипты и релизный tarball.
+- QA: install.sh --dry-run + два реальных прогона на CachyOS; финальный verify.sh
+  VERIFY OK, status-json валиден; симлинк/caps проверены `sing-box version`.
+
 ## 2026-09-08 (16) — Spec 010: таб Traffic rules как у v2RayTun
 
 ### Эталон снят вживую

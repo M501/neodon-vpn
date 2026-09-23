@@ -4,7 +4,7 @@
 # Usage: bash install.sh [--dry-run] [--uninstall] [--no-verify] [--help] [--version]
 set -euo pipefail
 
-VERSION="0.1.6"
+VERSION="0.1.7"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # tarball layout (bin/) or repo layout (scripts/) — both work
 BIN="$SRC/bin"; [ -d "$BIN" ] || BIN="$SRC/scripts"
@@ -63,7 +63,7 @@ for dep in python3 sing-box firewall-cmd systemctl; do
 done
 python3 -c "import PySide6" 2>/dev/null || { echo "MISSING dep: python3-PySide6" >&2; MISSING=1; }
 if [ "$MISSING" = 1 ]; then
-  echo "Install missing deps first (Bazzite: rpm-ostree / flatpak, manual step)." >&2
+  echo "Install missing deps first (Bazzite: rpm-ostree | Arch/CachyOS: sudo pacman -S sing-box firewalld python-pyside6)." >&2
   exit 2
 fi
 log "deps OK"
@@ -82,6 +82,23 @@ elif [ -t 0 ] && sudo -v; then
   log "sudo OK (asked once, cached)"
 else
   log "no sudo: continuing degraded (sudoers, linger, decky-bootstrap skipped)"
+fi
+
+# sing-box must be reachable at /usr/local/bin/sing-box: units and singbox-server.sh
+# hardcode that path (Bazzite layout). On Arch/CachyOS the package binary lives in
+# /usr/bin — link it and set tun0 caps so user services work without root.
+if [ ! -e /usr/local/bin/sing-box ] && command -v sing-box >/dev/null 2>&1; then
+  SB_REAL="$(command -v sing-box)"
+  if [ "$SUDO_OK" = 1 ]; then
+    dry "sing-box path: $SB_REAL -> /usr/local/bin/sing-box + caps" || {
+      sudo ln -sfn "$SB_REAL" /usr/local/bin/sing-box
+      sudo setcap cap_net_admin,cap_net_raw=ep "$SB_REAL" 2>/dev/null \
+        || log "warn: setcap failed — tun0 may need root (service will degrade)"
+    }
+  else
+    log "no cached sudo: /usr/local/bin/sing-box missing (found $SB_REAL) — fix manually:"
+    log "  sudo ln -sfn $SB_REAL /usr/local/bin/sing-box && sudo setcap cap_net_admin,cap_net_raw=ep $SB_REAL"
+  fi
 fi
 
 # 1. files: backend + GUI into ~/AI (live layout), bins into ~/.local/bin
@@ -192,7 +209,24 @@ if [ ! -x ~/homebrew/services/PluginLoader ] && [ ! -f ~/homebrew/services/Plugi
   fi
 fi
 if [ -d ~/homebrew/plugins ] && [ -d "$SRC/decky/neodon-vpn" ]; then
-  dry "decky plugin drop-in" || cp -r "$SRC/decky/neodon-vpn" ~/homebrew/plugins/
+  # root-owned drop-in (migrated systems / flatpak decks) breaks user-side cp:
+  # reclaim ownership first. never fatal — desktop always works, panel is a bonus.
+  if [ -e ~/homebrew/plugins/neodon-vpn ] && [ ! -w ~/homebrew/plugins/neodon-vpn ]; then
+    if [ "$SUDO_OK" = 1 ]; then
+      dry "decky: reclaim root-owned drop-in" || sudo chown -R "$USER:" ~/homebrew/plugins/neodon-vpn
+    else
+      log "decky drop-in is root-owned and no cached sudo — game panel may stay stale."
+    fi
+  fi
+  if ! dry "decky plugin drop-in"; then
+    if cp -r "$SRC/decky/neodon-vpn" ~/homebrew/plugins/ 2>/dev/null; then
+      :
+    elif [ "$SUDO_OK" = 1 ] && sudo cp -r "$SRC/decky/neodon-vpn" ~/homebrew/plugins/ 2>/dev/null; then
+      sudo chown -R "$USER:" ~/homebrew/plugins/neodon-vpn 2>/dev/null || true
+    else
+      log "decky drop-in failed (permissions): game panel needs manual fix (desktop unaffected)."
+    fi
+  fi
 else
   log "decky: skipped (no plugins dir or no decky/ in tarball)."
 fi
