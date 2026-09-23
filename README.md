@@ -19,6 +19,17 @@ missing).
 > Developers: this page is the shop window — the code lives below, but users
 > never need it. Do NOT tell users to clone the repo.
 
+## ⚙️ Dependencies
+
+The installer checks these and prints the exact fix when something is missing:
+`python3` + PySide6, `sing-box`, `firewalld`, user `systemd`.
+
+- **Arch / CachyOS:** `sudo pacman -S sing-box firewalld pyside6`
+- **Bazzite:** the base image has python/systemd; add what the checker lists
+  (`rpm-ostree install sing-box firewalld`, PySide6 from the image or `pip install --user PySide6`).
+- The installer itself creates `/usr/local/bin/sing-box` + `cap_net_admin`/`cap_net_raw`
+  when the distro keeps the binary elsewhere (e.g. `/usr/bin` on CachyOS).
+
 ## 🗺️ Where is what
 
 | Path | What |

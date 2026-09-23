@@ -7,6 +7,7 @@
 
 ## 2026-09-23 (55) — CachyOS: инсталлер доведён до [7/7]; sing-box path; регресс toggle
 
+- Релиз v0.1.7: https://github.com/M501/neodon-vpn/releases/tag/v0.1.7 (tarball + sha256; скачан с GitHub на CachyOS и сверен).
 - Жалоба владельца: «инсталлер ничего не устанавливает» (Ally X, свежая CachyOS).
   Репро: tarball v0.1.6, `bash install.sh` → умер на [6/7] `set -e`:
   `cp: Permission denied` в ~/homebrew/plugins/neodon-vpn (каталог root-owned
