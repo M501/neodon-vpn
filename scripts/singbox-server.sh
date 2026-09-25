@@ -109,12 +109,12 @@ PY
     stf=$(systemctl --user is-active sing-box-full.service 2>/dev/null)
     if [ "$st" = active ] || [ "$st" = activating ]; then
       systemctl --user restart sing-box.service
-      for i in $(seq 1 15); do systemctl --user is-active sing-box.service | grep -q active && break; sleep 1; done
+      for i in $(seq 1 50); do systemctl --user is-active sing-box.service | grep -q active && break; sleep 0.2; done
     elif [ "$stf" = active ] || [ "$stf" = activating ]; then
       systemctl --user restart sing-box-full.service
       # киллсвитч allowlist завязан на IP старого сервера — переустанавливаем
       # (install идемпотентен: добавляет IP нового сервера, ничего не флашит)
-      for i in $(seq 1 15); do systemctl --user is-active sing-box-full.service | grep -q active && break; sleep 1; done
+      for i in $(seq 1 50); do systemctl --user is-active sing-box-full.service | grep -q active && break; sleep 0.2; done
       bash ~/AI/singbox/killswitch.sh install >/dev/null 2>&1 && echo "KILLSWITCH: allowlist обновлён под " || echo "WARN: killswitch reinstall failed"
     fi
       # sync GUI header tag
@@ -131,7 +131,7 @@ out=json.loads(sys.argv[1]); tag=sys.argv[2]
 sel={"tag": tag or out.get("server",""), "server": out["server"], "server_port": out["server_port"], "updated": time.strftime("%Y-%m-%dT%H:%M:%S")}
 open(os.path.expanduser("~/AI/singbox/selected-server.json"),"w").write(json.dumps(sel, ensure_ascii=False, indent=2))
 PYEOF3
-    _last="/tmp/neodon-last-notify"; _now=$(date +%s); _prev=$(cat "$_last" 2>/dev/null || echo 0); if [ $((_now - _prev)) -ge 10 ]; then notify-send "VPN" "Сервер: $name" 2>/dev/null || true; echo "$_now" > "$_last"; fi
+    :  # notify-popup отключён (owner 2026-09-26)
     echo "OK: переключено на сервер $name"
   else
     cp "$CFG.bak" "$CFG"
