@@ -257,7 +257,7 @@ QWidget { color: #F5F5F7; font-size: 13px; }
 #h1 { font-size: 15px; font-weight: 700; color: #F5F5F7; }
 #h2 { font-size: 13px; font-weight: 600; color: #F5F5F7; }
 #muted { color: #9B9BA5; }
-#timer { font-size: 36px; font-weight: 800; color: #F5F5F7; font-family: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace; }
+#timer { font-size: 27px; font-weight: 800; color: #F5F5F7; font-family: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace; }
 QPushButton { border: none; border-radius: 10px; padding: 8px 14px; font-weight: 600; background: #26262E; color: #F5F5F7; }
 QPushButton:hover { background: #33333D; }
 QPushButton:pressed { background: #1F1F26; }
@@ -741,8 +741,15 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Neodon VPN")
-        self.resize(720, 700)
-        self.setMinimumSize(620, 680)
+        # adaptive: fit the available (logical) screen — small handhelds run scale 2.1
+        scr0 = QApplication.primaryScreen()
+        _w, _h = 700, 660
+        if scr0 is not None:
+            _av = scr0.availableGeometry()
+            _w = min(_w, max(420, _av.width() - 12))
+            _h = min(_h, max(420, _av.height() - 12))
+        self.resize(_w, _h)
+        self.setMinimumSize(420, 440)
         self._restore_geom()
         self.servers = []
         self.lats = {}
@@ -861,14 +868,14 @@ class MainWindow(QMainWindow):
             body.setFrameShape(QFrame.Shape.NoFrame)
             cont = QWidget()
             bl = QVBoxLayout(cont)
-            bl.setContentsMargins(14, 6, 14, 14)
-            bl.setSpacing(10)
+            bl.setContentsMargins(10, 4, 10, 10)
+            bl.setSpacing(8)
             body.setWidget(cont)
             outer.addWidget(body, 1)
             return w, bl
         bl = QVBoxLayout()
-        bl.setContentsMargins(14, 6, 14, 14)
-        bl.setSpacing(10)
+        bl.setContentsMargins(10, 4, 10, 10)
+        bl.setSpacing(8)
         outer.addLayout(bl, 1)
         return w, bl
 
@@ -885,9 +892,9 @@ class MainWindow(QMainWindow):
 
         self.power = QPushButton()
         self.power.setObjectName("powerBtn")
-        self.power.setFixedSize(84, 84)
+        self.power.setFixedSize(64, 64)
         self.power.setCheckable(True)
-        self.power.setIconSize(QSize(34, 34))
+        self.power.setIconSize(QSize(26, 26))
         self.power.setCursor(Qt.CursorShape.PointingHandCursor)
         self.power.clicked.connect(self.on_power)
         hb = QHBoxLayout()

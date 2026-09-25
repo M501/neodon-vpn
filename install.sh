@@ -4,7 +4,7 @@
 # Usage: bash install.sh [--dry-run] [--uninstall] [--no-verify] [--help] [--version]
 set -euo pipefail
 
-VERSION="0.1.7"
+VERSION="0.1.8"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # tarball layout (bin/) or repo layout (scripts/) — both work
 BIN="$SRC/bin"; [ -d "$BIN" ] || BIN="$SRC/scripts"
@@ -100,6 +100,11 @@ if [ ! -e /usr/local/bin/sing-box ] && command -v sing-box >/dev/null 2>&1; then
     log "  sudo ln -sfn $SB_REAL /usr/local/bin/sing-box && sudo setcap cap_net_admin,cap_net_raw=ep $SB_REAL"
   fi
 fi
+# legacy path: some shipped scripts look for ~/AI/singbox/sing-box
+if [ -e /usr/local/bin/sing-box ] && [ ! -e "$HOME/AI/singbox/sing-box" ]; then
+  dry "link ~/AI/singbox/sing-box -> /usr/local/bin/sing-box" \
+    || { mkdir -p "$HOME/AI/singbox"; ln -sfn /usr/local/bin/sing-box "$HOME/AI/singbox/sing-box"; }
+fi
 
 # 1. files: backend + GUI into ~/AI (live layout), bins into ~/.local/bin
 step "installing files"
@@ -160,6 +165,18 @@ if [ -f "$SRC/sudoers.d/neodon-vpn.template" ]; then
     }
   else
     log "skip sudoers (no cached sudo): killswitch will ask for password at runtime."
+  fi
+fi
+
+# 3b. polkit rule: resolved DNS actions without password prompts
+if [ -f "$SRC/polkit/49-neodon-allow.rules" ]; then
+  if [ "$SUDO_OK" = 1 ] && sudo -n true 2>/dev/null; then
+    dry "install /etc/polkit-1/rules.d/49-neodon-allow.rules" || {
+      sudo install -Dm644 "$SRC/polkit/49-neodon-allow.rules" /etc/polkit-1/rules.d/49-neodon-allow.rules
+      sudo systemctl restart polkit 2>/dev/null || true
+    }
+  else
+    log "skip polkit rule (no cached sudo): resolved DNS actions may prompt for a password."
   fi
 fi
 

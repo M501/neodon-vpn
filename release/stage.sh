@@ -9,7 +9,7 @@ STAGE=/tmp/neodon-rel
 rm -rf "$STAGE"
 mkdir -p "$STAGE/bin" "$STAGE/systemd" "$STAGE/desktop" "$STAGE/sudoers.d" \
          "$STAGE/profiles" "$STAGE/icons" "$STAGE/flags" "$STAGE/examples" \
-         "$STAGE/decky"
+         "$STAGE/decky" "$STAGE/polkit"
 # backend scripts + hostctl + GUI
 for f in singbox-toggle.sh singbox-server.sh killswitch.sh dns-fix.sh apply-profile.py neodon-hostctl; do
   [ -f "$SRC/scripts/$f" ] || { echo "repo broken: scripts/$f missing" >&2; exit 3; }
@@ -22,6 +22,7 @@ cp "$SRC/desktop/io.neodon.gui.desktop" "$STAGE/desktop/"
 cp "$SRC/desktop/Install Neodon VPN.desktop" "$STAGE/"
 [ -f "$SRC/desktop/io.neodon.gui.svg" ] && cp "$SRC/desktop/io.neodon.gui.svg" "$STAGE/desktop/"
 cp "$SRC/sudoers.d/neodon-vpn.template" "$STAGE/sudoers.d/"
+cp "$SRC/polkit/49-neodon-allow.rules" "$STAGE/polkit/"
 cp "$SRC"/profiles/*.json "$STAGE/profiles/"
 [ -d "$SRC/icons" ] && cp -r "$SRC/icons/." "$STAGE/icons/" 2>/dev/null || true
 cp "$SRC"/flags/*.png "$STAGE/flags/"

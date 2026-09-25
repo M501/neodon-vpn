@@ -4,8 +4,8 @@ DIR="$HOME/AI"
 RAW="$DIR/neodon-sub/raw.json"
 CFG="$DIR/singbox/config.json"
 CFG_FULL="$DIR/singbox/config-full.json"
-CFG_PROXY="$DIR/singbox/config-proxy.json"
-SB="/usr/local/bin/sing-box"
+SB="$DIR/singbox/sing-box"
+[ -x "$SB" ] || SB="$(command -v sing-box 2>/dev/null || echo /usr/local/bin/sing-box)"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 
 build_outbound() {
@@ -43,6 +43,15 @@ for o in cfg.get("outbounds") or []:
     elif net == "grpc":
         gr = st.get("grpcSettings") or {}
         out["transport"] = {"type": "grpc", "service_name": gr.get("serviceName") or "xyz"}
+    if st.get("security") == "tls":
+        ts = st.get("tlsSettings") or {}
+        out["tls"] = {
+            "enabled": True,
+            "server_name": ts.get("serverName") or s.get("address"),
+            "utls": {"enabled": True, "fingerprint": ts.get("fingerprint") or "chrome"},
+        }
+        if ts.get("alpn"):
+            out["tls"]["alpn"] = ts.get("alpn")
     if st.get("security") == "reality":
         r = st.get("realitySettings") or {}
         out["tls"] = {
@@ -55,10 +64,6 @@ for o in cfg.get("outbounds") or []:
                 "short_id": r.get("shortId") or "",
             },
         }
-    # normalize bogus qq fingerprint -> chrome
-    if "tls" in out and "utls" in out["tls"]:
-        if out["tls"]["utls"].get("fingerprint") in ("qq","QQ"):
-            out["tls"]["utls"]["fingerprint"] = "chrome"
     print(json.dumps(out))
     sys.exit(0)
 sys.exit(1)
@@ -88,18 +93,18 @@ set_server() {
   fi
   out=$(build_outbound "$n") || { echo "ОШИБКА: сервер $n не найден"; return 1; }
   name=$(echo "$out" | python3 -c 'import json,sys; print(json.load(sys.stdin)["server"])')
-  cp "$CFG" "$CFG.bak" && cp "$CFG_FULL" "$CFG_FULL.bak" && cp "$CFG_PROXY" "$CFG_PROXY.bak"
-  python3 - "$CFG" "$CFG_FULL" "$CFG_PROXY" "$out" <<'PY'
+  cp "$CFG" "$CFG.bak" && cp "$CFG_FULL" "$CFG_FULL.bak"
+  python3 - "$CFG" "$CFG_FULL" "$out" <<'PY'
 import json, sys
-cfg, cfg_full, cfg_proxy, out = sys.argv[1], sys.argv[2], sys.argv[3], json.loads(sys.argv[4])
-for p in (cfg, cfg_full, cfg_proxy):
+cfg, cfg_full, out = sys.argv[1], sys.argv[2], json.loads(sys.argv[3])
+for p in (cfg, cfg_full):
     d = json.load(open(p))
     d["outbounds"] = [out if o.get("tag") == "proxy" else o for o in d["outbounds"]]
     with open(p, "w") as f:
         json.dump(d, f, indent=2, ensure_ascii=False)
         f.write("\n")
 PY
-  if "$SB" check -c "$CFG" >/dev/null 2>&1 && "$SB" check -c "$CFG_FULL" >/dev/null 2>&1 && "$SB" check -c "$CFG_PROXY" >/dev/null 2>&1; then
+  if "$SB" check -c "$CFG" >/dev/null 2>&1 && "$SB" check -c "$CFG_FULL" >/dev/null 2>&1; then
     st=$(systemctl --user is-active sing-box.service 2>/dev/null)
     stf=$(systemctl --user is-active sing-box-full.service 2>/dev/null)
     if [ "$st" = active ] || [ "$st" = activating ]; then
@@ -111,9 +116,6 @@ PY
       # (install идемпотентен: добавляет IP нового сервера, ничего не флашит)
       for i in $(seq 1 15); do systemctl --user is-active sing-box-full.service | grep -q active && break; sleep 1; done
       bash ~/AI/singbox/killswitch.sh install >/dev/null 2>&1 && echo "KILLSWITCH: allowlist обновлён под " || echo "WARN: killswitch reinstall failed"
-    elif [ "$(systemctl --user is-active sing-box-proxy.service 2>/dev/null)" = active ] || [ "$(systemctl --user is-active sing-box-proxy.service 2>/dev/null)" = activating ]; then
-      systemctl --user restart sing-box-proxy.service
-      for i in $(seq 1 15); do systemctl --user is-active sing-box-proxy.service | grep -q active && break; sleep 1; done
     fi
       # sync GUI header tag
     TAG=$(python3 - "$RAW" "$n" 2>/dev/null <<'PYEOF2'
@@ -129,12 +131,11 @@ out=json.loads(sys.argv[1]); tag=sys.argv[2]
 sel={"tag": tag or out.get("server",""), "server": out["server"], "server_port": out["server_port"], "updated": time.strftime("%Y-%m-%dT%H:%M:%S")}
 open(os.path.expanduser("~/AI/singbox/selected-server.json"),"w").write(json.dumps(sel, ensure_ascii=False, indent=2))
 PYEOF3
-    _last="/tmp/neodon-last-notify"; _now=$(date +%s); _prev=$(cat "$_last" 2>/dev/null || echo 0); if [ $((_now - _prev)) -ge 10 ]; then :; echo "$_now" > "$_last"; fi
+    _last="/tmp/neodon-last-notify"; _now=$(date +%s); _prev=$(cat "$_last" 2>/dev/null || echo 0); if [ $((_now - _prev)) -ge 10 ]; then notify-send "VPN" "Сервер: $name" 2>/dev/null || true; echo "$_now" > "$_last"; fi
     echo "OK: переключено на сервер $name"
   else
     cp "$CFG.bak" "$CFG"
     cp "$CFG_FULL.bak" "$CFG_FULL"
-    cp "$CFG_PROXY.bak" "$CFG_PROXY"
     echo "ОШИБКА: конфигурация не прошла sing-box check — восстановлено"
     return 1
   fi
