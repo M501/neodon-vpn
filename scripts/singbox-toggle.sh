@@ -67,7 +67,7 @@ case "$1" in
       exit 1
     fi
     wd_reset
-    EXIT=$(curl -s -m 3 https://api.ipify.org 2>/dev/null)
+    EXIT=$(curl -s -m 2 https://api.ipify.org 2>/dev/null)
     if [ -n "$EXIT" ] && [[ "$EXIT" != 79.139.* ]]; then
       echo "VPN FULL ON (READY) — exit $EXIT"
       notify "VPN FULL ON — exit $EXIT"
@@ -114,11 +114,23 @@ status-json)
         echo "$_fw_dump" | grep -q 'filter OUTPUT_direct 20 ' && locked=true ;;
     esac
     if ip link show tun0 >/dev/null 2>&1; then tun_up=true; else tun_up=false; fi
-    em=2; [ -f "$TRANS_MARKER" ] && em=5
+    em=3; [ -f "$TRANS_MARKER" ] && em=5
     exit_ip=""
     case "$desired" in
-      full|smart) if [ "$tun_up" = true ]; then exit_ip=$(curl -s -m $em https://api.ipify.org 2>/dev/null); else exit_ip=""; fi ;;
-      proxy) if (echo > /dev/tcp/127.0.0.1/10808) 2>/dev/null; then exit_ip=$(curl -s -m $em -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null); else exit_ip=""; fi ;;
+      full|smart) if [ "$tun_up" = true ]; then
+          exit_ip=$(curl -s -m $em https://api.ipify.org 2>/dev/null)
+          # slow retry only when the fast probe failed AND not mid-transition
+          # (busy torrents make 2-3s probes flaky; a single miss must not flap DEGRADED)
+          if [ -z "$exit_ip" ] && [ ! -f "$TRANS_MARKER" ]; then
+            exit_ip=$(curl -s -m 6 https://api.ipify.org 2>/dev/null)
+          fi
+        else exit_ip=""; fi ;;
+      proxy) if (echo > /dev/tcp/127.0.0.1/10808) 2>/dev/null; then
+          exit_ip=$(curl -s -m $em -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null)
+          if [ -z "$exit_ip" ] && [ ! -f "$TRANS_MARKER" ]; then
+            exit_ip=$(curl -s -m 6 -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null)
+          fi
+        else exit_ip=""; fi ;;
     esac
     exit_ok=false
     if [ -n "$exit_ip" ]; then
