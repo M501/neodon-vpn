@@ -840,3 +840,28 @@
 ## Ссылки
 - `M501/neodon-vpn` (public, master `c59464a` → теперь с touch), `M501/vpn-stack-linux-bazzite` (private).
 - SD `/run/media/m26/0000-D182/neodon-vpn`, хост `~/AI` `sing-box 1.13.18 caps ep`.
+
+
+## 2026-09-26 — CachyOS live-fix + GUI state-runner (ночь/утро)
+
+### Бэкенд
+- `singbox-server.sh`: обработка `security=="tls"` (grpc/tls-профили более не теряли TLS → «свеча»); fallback пути sing-box (`~/AI/singbox/sing-box` → `command -v sing-box`).
+- `singbox-toggle.sh`: status/status-json без mutex (клики юзера больше не ждут медленный опрос); `firewall-cmd` в статусе только для full/off; exit-проба: em=3 + медленный ретрай `-m 6` (при фейле и вне перехода) — под нагрузкой (торрент) проба флапала 1/5 → ложный «Reconnecting…»; off-ветка: poll готовности вместо `sleep 2`; удалён bazzite-остаток firefox-proxy; защита от залипшего `.transitioning` (>15с).
+- Конфиги (CachyOS): tun `stack: gvisor` (system-стек на CachyOS мёртв: SYN-SENT, sing-box не читал tun) во всех трёх конфигах; DNS `final: local` (DoT-via-proxy висел).
+- `examples/*.example`: stack gvisor (свежая установка сразу рабочая).
+
+### GUI (`neodon-vpn.py`)
+- Адаптивное окно под экран (KDE scale 2.1 → logical 914×514: окно было 720×700 с min 680 — не влезало); компактная вёрстка (таймер 24px, кнопка 64px, отступы).
+- Кнопка питания: круглая (border-radius 32 при 64px — 42px после ресайза давал квадрат).
+- «Stopping…» вместо «Switching…» при выключении.
+- Settle-игнор убран: клик всегда проходит (занято → очередь last-wins) — было «нажимаю — не даёт».
+- PROXY/TUNNEL кликабельны всегда (OFF + changed=False теперь включает VPN в этом режиме).
+- Burst-опрос в переходе 1.5с → 0.5с.
+
+### Инсталлер/релиз
+- install.sh v0.1.8: +polkit-правило `org.freedesktop.resolve1.*` (без запросов пароля), +legacy symlink sing-box, sudoers +cp/rm/ln resolv.conf (+путь /usr/bin/firewall-cmd).
+- release/stage.sh: пакет `polkit/` в tarball.
+- QA: `scripts/qa-gui-states.sh` — прогон 8 кейсов тап-инжектом (uinput), PASS 8/8 на живом хосте.
+
+### Известное
+- Серверы [4] DE (g1.confstage.app, grpc/tls) и [6] RU (con.3, reality) не отвечают со стороны провайдера — 9/11 рабочих.

@@ -5,6 +5,7 @@ RAW="$DIR/neodon-sub/raw.json"
 CFG="$DIR/singbox/config.json"
 CFG_FULL="$DIR/singbox/config-full.json"
 SB="$DIR/singbox/sing-box"
+[ -x "$SB" ] || SB="$(command -v sing-box 2>/dev/null || echo /usr/local/bin/sing-box)"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 
 build_outbound() {
@@ -42,6 +43,15 @@ for o in cfg.get("outbounds") or []:
     elif net == "grpc":
         gr = st.get("grpcSettings") or {}
         out["transport"] = {"type": "grpc", "service_name": gr.get("serviceName") or "xyz"}
+    if st.get("security") == "tls":
+        ts = st.get("tlsSettings") or {}
+        out["tls"] = {
+            "enabled": True,
+            "server_name": ts.get("serverName") or s.get("address"),
+            "utls": {"enabled": True, "fingerprint": ts.get("fingerprint") or "chrome"},
+        }
+        if ts.get("alpn"):
+            out["tls"]["alpn"] = ts.get("alpn")
     if st.get("security") == "reality":
         r = st.get("realitySettings") or {}
         out["tls"] = {

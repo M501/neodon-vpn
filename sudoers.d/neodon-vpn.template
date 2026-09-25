@@ -2,6 +2,13 @@
 # Covers EXACTLY what the shipped scripts invoke; nothing else.
 # TODO(security-hardening): route all privileged ops through ONE neodon-priv
 # wrapper (allowlist up|down|status) instead of per-binary rules.
-@USER@ ALL=(root) NOPASSWD: /usr/sbin/firewall-cmd --direct *
+@USER@ ALL=(root) NOPASSWD: /usr/bin/firewall-cmd --direct *
 @USER@ ALL=(root) NOPASSWD: /usr/bin/tee /etc/resolv.conf*
+@USER@ ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/resolv.conf
+@USER@ ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/resolv.conf.neodon.link
+@USER@ ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/resolv.conf.neodon.bak
+@USER@ ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/resolv.conf.neodon.link /etc/resolv.conf.neodon.bak
+@USER@ ALL=(root) NOPASSWD: /usr/bin/ln -s * /etc/resolv.conf
+@USER@ ALL=(root) NOPASSWD: /usr/bin/cp /etc/resolv.conf /etc/resolv.conf.neodon.bak
+@USER@ ALL=(root) NOPASSWD: /usr/bin/cp /etc/resolv.conf.neodon.bak /etc/resolv.conf
 @USER@ ALL=(root) NOPASSWD: /usr/bin/loginctl enable-linger *
