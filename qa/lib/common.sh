@@ -76,7 +76,7 @@ PY
 }
 
 canonical() {
-    bash "$BACKEND_ROOT/apply-profile.py" default || return 1
+    python3 "$BACKEND_ROOT/apply-profile.py" default || return 1
     bash "$BACKEND_ROOT/singbox-toggle.sh" smart || return 1
     bash "$BACKEND_ROOT/singbox-server.sh" set "$WORKING_SERVER" || return 1
     return 0

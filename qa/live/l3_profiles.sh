@@ -15,7 +15,7 @@ fi
 
 case_F1() { ((${#PROFILES[@]} == 11)); }
 case_F2() { for p in "${PROFILES[@]}"; do python3 -m json.tool "$p" >/dev/null; done; }
-case_F3() { bash "$BACKEND_ROOT/apply-profile.py" default >/dev/null; }
+case_F3() { python3 "$BACKEND_ROOT/apply-profile.py" default >/dev/null; }
 case_F4() { [[ "$(cat "$BACKEND_ROOT/.profile" 2>/dev/null || true)" == default ]]; }
 case_E1() { [[ -f "$HOME/AI/neodon-sub/raw.json" ]] || return 0; python3 -m json.tool "$HOME/AI/neodon-sub/raw.json" >/dev/null; }
 case_E2() { return 77; } # expired-link refresh requires a controllable subscription fixture
