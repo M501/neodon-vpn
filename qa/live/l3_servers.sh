@@ -8,7 +8,10 @@ if ! require_live; then
 fi
 
 LIST_OUT="$(bash "$BACKEND_ROOT/singbox-server.sh" list 2>&1 || true)"
-INDICES=($(printf '%s\n' "$LIST_OUT" | grep -oE '\[[0-9]+\]' | tr -d '[]' | sort -nu))
+INDICES=($(printf '%s\n' "$LIST_OUT" | sed -n 's/^\([0-9][0-9]*\)).*/\1/p' | sort -nu))
+if [ "${#INDICES[@]}" -eq 0 ]; then
+  INDICES=($(printf '%s\n' "$LIST_OUT" | grep -oE '\[[0-9]+\]' | tr -d '[]' | sort -nu))
+fi
 if [ "${#INDICES[@]}" -eq 0 ]; then
   skip_case C1 "server list did not expose numeric indices"
   for id in C2 C3 C4 C5 C6 C7 C8 C9; do skip_case "$id" "server matrix unavailable"; done
