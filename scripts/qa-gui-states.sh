@@ -12,9 +12,55 @@ if [ -n "${SID:-}" ] && [ "$(loginctl show-session "$SID" -p LockedHint 2>/dev/n
   echo "SKIP: session locked — tap tests need an unlocked screen"; exit 77
 fi
 SJ="bash $HOME/AI/singbox/singbox-toggle.sh status-json"
-POWER_X=1014; POWER_Y=268
-PROXY_X=697;  PROXY_Y=604
-TUNNEL_X=1326; TUNNEL_Y=604
+
+# --- наводим координаты по ЖИВОМУ скрину (хардкод-пиксели ломались от сдвига окна) ---
+SHOT=/tmp/qa-gui-state.png
+locate_buttons() {
+  XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+    WAYLAND_DISPLAY="$WAYLAND_DISPLAY" spectacle -b -n -o "$SHOT" >/dev/null 2>&1 || true
+  sleep 3
+  [ -s "$SHOT" ] || return 1
+  local out
+  out=$(python3 - "$SHOT" <<'PY'
+import sys, json
+try:
+    from PIL import Image
+    im = Image.open(sys.argv[1]).convert('RGB'); px = im.load(); W, H = im.size
+except Exception:
+    print("{}"); sys.exit(0)
+def near(c, t, tol=24):
+    return abs(c[0]-t[0]) <= tol and abs(c[1]-t[1]) <= tol and abs(c[2]-t[2]) <= tol
+res = {}
+# power button: checked fill #2A5FD8 circle, upper half
+pts = [(x, y) for y in range(80, H//2 + 250) for x in range(200, W-200) if near(px[x, y], (42, 95, 216))]
+if pts:
+    xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
+    if max(xs)-min(xs) < 400:  # sanity: not a huge blob
+        res['power'] = [(min(xs)+max(xs))//2, (min(ys)+max(ys))//2]
+# mode row: active PROXY accent #3373F7 rect below power
+if 'power' in res:
+    py = res['power'][1]
+    pts2 = [(x, y) for y in range(py+70, H-60) for x in range(120, W-120) if near(px[x, y], (51, 115, 247), 20)]
+    left = [p2 for p2 in pts2 if p2[0] < res['power'][0]]
+    if left:
+        xs = [q[0] for q in left]; ys = [q[1] for q in left]
+        cx = (min(xs)+max(xs))//2; cy = (min(ys)+max(ys))//2
+        res['proxy'] = [cx, cy]
+        res['tunnel'] = [2*res['power'][0]-cx, cy]
+print(json.dumps(res))
+PY
+)
+  [ -n "$out" ] || return 1
+  POWER_X=$(printf '%s' "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("power",[0,0])[0])')
+  POWER_Y=$(printf '%s' "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("power",[0,0])[1])')
+  PROXY_X=$(printf '%s' "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("proxy",[0,0])[0])')
+  PROXY_Y=$(printf '%s' "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("proxy",[0,0])[1])')
+  TUNNEL_X=$(printf '%s' "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("tunnel",[0,0])[0])')
+  TUNNEL_Y=$(printf '%s' "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("tunnel",[0,0])[1])')
+  [ "${POWER_X:-0}" -gt 0 ] || return 1
+  return 0
+}
+POWER_X=0; POWER_Y=0; PROXY_X=0; PROXY_Y=0; TUNNEL_X=0; TUNNEL_Y=0
 PASS=0; FAIL=0
 st()  { $SJ 2>/dev/null | python3 -c 'import json,sys;print(json.load(sys.stdin).get("actual_state","?"))' 2>/dev/null; }
 dsk() { $SJ 2>/dev/null | python3 -c 'import json,sys;print(json.load(sys.stdin).get("desired_mode","?"))' 2>/dev/null; }
@@ -30,6 +76,11 @@ if [ "$(st)" != "CONNECTED" ] || [ "$(dsk)" != "smart" ]; then
   wait_state CONNECTED 15 || true
 fi
 echo "start: state=$(st) desired=$(dsk)"
+echo "TC0 locate buttons on live screen"
+if ! locate_buttons; then
+  echo "SKIP: Neodon window not found on screen (taps would go nowhere)"; exit 77
+fi
+echo "  buttons: power=(${POWER_X},${POWER_Y}) proxy=(${PROXY_X},${PROXY_Y}) tunnel=(${TUNNEL_X},${TUNNEL_Y})"
 
 echo "TC1 power-off (tap power)"
 tap $POWER_X $POWER_Y
