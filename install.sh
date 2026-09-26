@@ -141,8 +141,13 @@ if ls "$SRC"/systemd/*.service >/dev/null 2>&1; then
   dry "install user units + daemon-reload + disable autostart" || {
     mkdir -p ~/.config/systemd/user
     cp "$SRC"/systemd/*.service ~/.config/systemd/user/
+    [ -f "$SRC/systemd/neodon-tunnel-guard.timer" ] && cp "$SRC/systemd/neodon-tunnel-guard.timer" ~/.config/systemd/user/
     systemctl --user daemon-reload
     systemctl --user disable neodon-boot.service sing-box.service sing-box-full.service sing-box-proxy.service 2>/dev/null || true
+    # quota guard is a service timer (не VPN-автозапуск): он ТОЛЬКО возвращает full->smart
+    if [ -f ~/.config/systemd/user/neodon-tunnel-guard.timer ]; then
+      systemctl --user enable --now neodon-tunnel-guard.timer 2>/dev/null || true
+    fi
   }
 fi
 if ! loginctl show-user "$USER" 2>/dev/null | grep -q "Linger=yes"; then

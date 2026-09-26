@@ -1,0 +1,6 @@
+[Unit]
+Description=Neodon tunnel guard (quota protection for full mode)
+
+[Service]
+Type=oneshot
+ExecStart=%h/AI/singbox/neodon-tunnel-guard.sh

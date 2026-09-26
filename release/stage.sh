@@ -17,7 +17,7 @@ for f in singbox-toggle.sh singbox-server.sh killswitch.sh dns-fix.sh apply-prof
 done
 cp "$SRC/tests/app/neodon-vpn.py" "$STAGE/bin/neodon-vpn.py"
 # units / desktop / sudoers / data
-cp "$SRC"/systemd/*.service "$STAGE/systemd/"
+cp "$SRC"/systemd/*.service "$SRC"/systemd/*.timer "$STAGE/systemd/" 2>/dev/null || cp "$SRC"/systemd/*.service "$STAGE/systemd/"
 cp "$SRC/desktop/io.neodon.gui.desktop" "$STAGE/desktop/"
 cp "$SRC/desktop/Install Neodon VPN.desktop" "$STAGE/"
 [ -f "$SRC/desktop/io.neodon.gui.svg" ] && cp "$SRC/desktop/io.neodon.gui.svg" "$STAGE/desktop/"

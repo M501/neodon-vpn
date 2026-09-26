@@ -6,6 +6,10 @@ No network, no services, no GUI shown. ponytail: stdlib + pytest only.
 import importlib.util
 import os
 
+# CI/SSH-safe: без сессии Qt падает мгновенно — форсируем offscreen
+if not (os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY")):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 APP = os.environ.get("NEODON_APP", "/home/m26/AI/neodon-vpn/neodon-vpn.py")
 
 _mod = None
@@ -297,7 +301,12 @@ def test_polls_dont_rehighlight_mid_toggle(monkeypatch):
     assert win.btn_tunnel.isChecked(), "backend truth applies after op"
 
 
-def test_power_settle_ignores_double_tap(monkeypatch):
+def test_power_tap_not_swallowed_after_off(monkeypatch):
+    """Owner-policy 2026-09-26: клик после выключения НЕ должен проглатываться.
+
+    Было: settle-окно 5с молча съедало тап («нажимаю — не даёт включить»).
+    Стало: клик всегда проходит (занято → очередь last-wins, свободно → сразу).
+    """
     import time as _t
     m = app()
     win = _make_win(m, monkeypatch)
@@ -306,8 +315,9 @@ def test_power_settle_ignores_double_tap(monkeypatch):
     win.toggle = lambda mode: calls.append(mode)
     win._settle_until = _t.monotonic() + 5
     win.on_power()
-    assert calls == [], "tap right after OFF must not re-enable"
+    assert calls == ["smart"], "tap after OFF must turn ON (no swallowed taps)"
     win._settle_until = 0
+    calls.clear()
     win.on_power()
     assert calls == [win.mode], "deliberate press still works"
 
