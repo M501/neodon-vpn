@@ -6,6 +6,11 @@
 export XDG_RUNTIME_DIR=/run/user/1000
 export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
 export WAYLAND_DISPLAY=wayland-0
+# prerequisite gate: taps require an unlocked session (locked -> skip, exit 77)
+SID="$(loginctl list-sessions --no-legend 2>/dev/null | awk -v u="$USER" '$3==u{print $1; exit}')"
+if [ -n "${SID:-}" ] && [ "$(loginctl show-session "$SID" -p LockedHint 2>/dev/null)" = "LockedHint=yes" ]; then
+  echo "SKIP: session locked — tap tests need an unlocked screen"; exit 77
+fi
 SJ="bash $HOME/AI/singbox/singbox-toggle.sh status-json"
 POWER_X=1014; POWER_Y=268
 PROXY_X=697;  PROXY_Y=604

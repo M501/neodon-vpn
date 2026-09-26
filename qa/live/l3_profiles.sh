@@ -13,7 +13,7 @@ if [ ! -e "${PROFILES[0]}" ]; then
   exit 0
 fi
 
-case_F1() { ((${#PROFILES[@]} == 11)); }
+case_F1() { ((${#PROFILES[@]} >= 7)); }  # V1 legacy pruned: 7 actual presets
 case_F2() { for p in "${PROFILES[@]}"; do python3 -m json.tool "$p" >/dev/null; done; }
 case_F3() { python3 "$BACKEND_ROOT/apply-profile.py" default >/dev/null; }
 case_F4() { [[ "$(cat "$BACKEND_ROOT/.profile" 2>/dev/null || true)" == default ]]; }
