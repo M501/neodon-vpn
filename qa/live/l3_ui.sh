@@ -14,6 +14,11 @@ case_K1() {
   [[ -s "$SHOT" ]]
 }
 case_K2() {
+  # prerequisites: unlocked session + CONNECTED (blue checked power button only then)
+  SID="$(loginctl list-sessions --no-legend 2>/dev/null | awk -v u="$USER" '$3==u{print $1; exit}')"
+  if [ -n "${SID:-}" ] && [ "$(loginctl show-session "$SID" -p LockedHint 2>/dev/null)" = "LockedHint=yes" ]; then return 77; fi
+  ST="$(bash "$BACKEND_ROOT/singbox-toggle.sh" status-json 2>/dev/null | python3 -c 'import json,sys;print(json.load(sys.stdin).get("actual_state",""))' 2>/dev/null || true)"
+  [ "$ST" = "CONNECTED" ] || return 77
   python3 - "$SHOT" <<'PY'
 from PIL import Image
 import sys
