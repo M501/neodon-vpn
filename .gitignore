@@ -12,3 +12,5 @@ geosite.db
 .watchdog-state.json
 .mode
 .selected-server.json
+qa-results/
+.pytest_cache/
