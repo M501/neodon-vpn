@@ -8,5 +8,6 @@ ExecStart=/usr/local/bin/sing-box run -c %h/AI/singbox/config-full.json
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=3
+ExecStopPost=/bin/bash %h/AI/singbox/neodon-heal.sh
 [Install]
 WantedBy=default.target

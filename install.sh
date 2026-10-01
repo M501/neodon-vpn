@@ -106,11 +106,31 @@ if [ -e /usr/local/bin/sing-box ] && [ ! -e "$HOME/AI/singbox/sing-box" ]; then
     || { mkdir -p "$HOME/AI/singbox"; ln -sfn /usr/local/bin/sing-box "$HOME/AI/singbox/sing-box"; }
 fi
 
+# caps self-heal (idempotent): package upgrades replace the binary and strip
+# file capabilities -> all TUN modes die with 'TUNSETIFF: operation not permitted'.
+SB_REAL="$(readlink -f /usr/local/bin/sing-box 2>/dev/null || command -v sing-box 2>/dev/null || true)"
+if [ -n "$SB_REAL" ] && [ -x "$SB_REAL" ] && [ "$SUDO_OK" = 1 ]; then
+  dry "re-assert tun0 caps on $SB_REAL" \
+    || sudo setcap cap_net_admin,cap_net_raw=ep "$SB_REAL" 2>/dev/null \
+    || log "warn: setcap failed — tun0 may need root (service will degrade)"
+fi
+# keep caps across pacman upgrades (Arch/CachyOS): PostTransaction hook
+HOOK_SRC="$SRC/hooks/90-neodon-sing-box-caps.hook"
+if [ -d /etc/pacman.d/hooks ] && [ -f "$HOOK_SRC" ]; then
+  if [ "$SUDO_OK" = 1 ]; then
+    dry "install pacman caps-hook -> /etc/pacman.d/hooks/" \
+      || sudo install -m 644 "$HOOK_SRC" /etc/pacman.d/hooks/90-neodon-sing-box-caps.hook
+  else
+    log "no cached sudo: pacman caps-hook not installed — run manually:"
+    log "  sudo install -m 644 $HOOK_SRC /etc/pacman.d/hooks/"
+  fi
+fi
+
 # 1. files: backend + GUI into ~/AI (live layout), bins into ~/.local/bin
 step "installing files"
 dry "mkdir -p ~/AI/singbox ~/AI/singbox/profiles ~/AI/neodon-vpn/icons ~/.local/bin ~/.local/share/applications" \
   || mkdir -p ~/AI/singbox ~/AI/singbox/profiles ~/AI/neodon-vpn/icons ~/.local/bin ~/.local/share/applications
-for f in singbox-toggle.sh singbox-server.sh killswitch.sh dns-fix.sh apply-profile.py; do
+for f in singbox-toggle.sh singbox-server.sh killswitch.sh dns-fix.sh apply-profile.py neodon-heal.sh neodon-watchdog.sh; do
   [ -f "$BIN/$f" ] || { echo "package broken: $f missing in $BIN" >&2; exit 3; }
   dry "install -Dm755 $f ~/AI/singbox/$f" || install -Dm755 "$BIN/$f" "$HOME/AI/singbox/$f"
 done
@@ -142,11 +162,17 @@ if ls "$SRC"/systemd/*.service >/dev/null 2>&1; then
     mkdir -p ~/.config/systemd/user
     cp "$SRC"/systemd/*.service ~/.config/systemd/user/
     [ -f "$SRC/systemd/neodon-tunnel-guard.timer" ] && cp "$SRC/systemd/neodon-tunnel-guard.timer" ~/.config/systemd/user/
+    [ -f "$SRC/systemd/neodon-watchdog.timer" ] && cp "$SRC/systemd/neodon-watchdog.timer" ~/.config/systemd/user/
     systemctl --user daemon-reload
     systemctl --user disable neodon-boot.service sing-box.service sing-box-full.service sing-box-proxy.service 2>/dev/null || true
     # quota guard is a service timer (не VPN-автозапуск): он ТОЛЬКО возвращает full->smart
     if [ -f ~/.config/systemd/user/neodon-tunnel-guard.timer ]; then
       systemctl --user enable --now neodon-tunnel-guard.timer 2>/dev/null || true
+    fi
+    # watchdog (тоже не VPN-автозапуск): чистит следы VPN, когда туннеля нет, и
+    # не даёт мёртвому full-туннелю погасить весь интернет — см. CHANGES.md 2026-10-01
+    if [ -f ~/.config/systemd/user/neodon-watchdog.timer ]; then
+      systemctl --user enable --now neodon-watchdog.timer 2>/dev/null || true
     fi
   }
 fi

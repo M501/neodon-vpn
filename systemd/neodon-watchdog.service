@@ -1,0 +1,7 @@
+[Unit]
+Description=Neodon watchdog - keep internet alive without the VPN
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash %h/AI/singbox/neodon-watchdog.sh

@@ -25,6 +25,8 @@ stop_all() {
 case "$1" in
   smart|full|proxy|off)
     touch "$TRANS_MARKER"
+    # internet-first: любой тоггл сначала убирает следы прошлого сбоя
+    bash ~/AI/singbox/neodon-heal.sh >/dev/null 2>&1 || true
     ;;
 esac
 case "$1" in
@@ -34,6 +36,7 @@ case "$1" in
     fw_flush
     bash ~/AI/singbox/dns-fix.sh apply || true
     set_mode full
+    date +%s > "$HOME/AI/singbox/.full-since"
     if ! systemctl --user start sing-box-full.service; then
       echo "FULL FAILED — service start error; firewall state: $(sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null | wc -l) rules; if LOCKED run 'toggle off' to unlock"
       notify "FULL FAILED — service start error (firewall LOCKED)"
