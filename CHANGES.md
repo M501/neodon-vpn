@@ -5,6 +5,73 @@
 
 
 
+## 2026-10-01 (57) — DNS ушёл внутрь туннеля: блокируемые сайты снова открываются
+
+- Симптом (владелец, Game Mode через Decky-панель): «VPN не работает на портативке; никуда
+  не зайти, даже в магазин приложений Decky; пока открыта страница плагина — что-то живое,
+  вышел — всё отвалилось».
+- Диагноз (живой хост, smart CONNECTED, exit 80.47.13.215): туннель был жив (github/discord/
+  api.ipify.org → 200), но ровно то, ради чего VPN нужен, — недоступно: `www.youtube.com`
+  → `NXDOMAIN`, по IP — таймаут 15с; `instagram`/`x.com` → 000 и через TUN, и через socks5h.
+  Cloudflare DoH подтверждает, что домены существуют ⇒ ответ отравлен.
+- Причина: в живых конфигах стояло `dns.final: "local"` + `route.default_domain_resolver:
+  "local"` = plaintext-DNS (udp 1.1.1.1) через ISP. DPI отвечает NXDOMAIN/отравой, поэтому
+  при ВКЛЮЧЁННОМ VPN названия не резолвятся — «VPN включён, но ничего не грузится».
+  Панель при этом честно показывала CONNECTED: проба exit-IP ходит по IP, DNS ей не нужен.
+  В репо генератор уже писал `dns.final: "remote"` (DoT через прокси) — живой хост разошёлся
+  с репо (live-патч), а `default_domain_resolver` в генераторе остался `local`.
+- Фикс (генератор + три живых конфига, `sing-box check` rc=0 ×3, backup в /tmp/cfg-fix-*):
+  `dns.final: "remote"` + `route.default_domain_resolver: "remote"` — резолв идёт по туннелю
+  (DoT 1.1.1.1 detour proxy), ISP-отрава не участвует; у proxy-аутбаунда `domain_resolver:
+  "local"` — bootstrap домена сервера (ws3.confstage.com), иначе цикл: проверено, без
+  оверрайда не поднималось вообще ничего. Генератор: `stack: "gvisor"` (в репо дремал
+  `system` — регенерация сломала бы TUN, как в инциденте 2026-09-27).
+- Изолированная проверка (отдельный инстанс sing-box без TUN на :10809) — до/после 0/4 vs 4/4:
+  при `final: remote` youtube 200, google 200, instagram 200, example.com 200.
+- Живьём после фикса (smart CONNECTED): youtube 200, instagram 200, google 200, github 200,
+  yandex.ru 301, `plugins.deckbrew.xyz` (магазин Decky) 200; DNS-ответы настоящие
+  (142.251.x / 5.255.255.77). Владельцу состояние возвращено в ON (smart), как было на входе.
+- Что НЕ подтвердилось (честно): «закрыл панель — VPN выключился». В коде панели нет пути
+  остановки (`_unload` = pass, стоп только явным `vpn_down`); журнал плагина и webhelper-лог
+  за сегодня не содержат ни одного вызова бэкенда из панели (последние — 27.09), а VPN был
+  CONNECTED 12 часов подряд. «Лежит выключен» может быть только честным отражением реального
+  DEGRADED/FAILED — и серверы подписки периодически отказывают пачкой
+  (`dial tcp <все 5 IP>:443: connect: connection refused`), это сторона провайдера.
+- Осталось (не блокер): тумблер в QAM считает «включён» только при `actual_state == CONNECTED`,
+  поэтому в DEGRADED выглядит выключенным (нужен ребилд фронтенда — на хосте нет node/rollup);
+  `resolv.conf` после resume перезаписывает NetworkManager (статику dns-fix теряет, но на
+  резолв не влияет: resolved всё равно спрашивает DNS tun0). Серверы 4/5 подписки мертвы,
+  0-3 живые.
+
+## 2026-09-27 (56) — Caps слетели после апгрейда пакета (все TUN-режимы мертвы); pacman-hook; компактный GUI
+
+- Симптом (жалоба владельца): «ни к одному серверу не подключиться» и в десктопе, и в игровом
+  режиме. `journalctl --user -u sing-box`: рестарт-луп `FATAL ... TUNSETIFF: operation
+  not permitted` (counter >1000).
+- Диагноз: в 18:33 pacman обновил пакет `sing-box` 1.14.1-2 → 1.14.2-1.1, заменил
+  `/usr/bin/sing-box` — file caps `cap_net_admin,cap_net_raw=ep` слетели (`getcap` пуст);
+  `/usr/local/bin/sing-box` — симлинк, капабилити жили на цели. Без caps user-сервис
+  не может открыть /dev/net/tun.
+- Фикс класса (не симптома): pacman `PostTransaction` hook `90-neodon-sing-box-caps.hook`
+  (`/etc/pacman.d/hooks/`) переставляет setcap после любого install/upgrade пакета.
+  Доказано живьём: `sudo pacman -S --noconfirm sing-box` → hooks run «(5/8) Neodon VPN:
+  restore cap_net_admin…» + `getcap /usr/bin/sing-box` = `ep` + TUN поднимается.
+  Немедленный setcap уже вернул VPN: smart CONNECTED, exit 94.183.209.x, latency 14 ms.
+- Инсталлер: caps self-heal стал идемпотентным при каждом прогоне + установка hook (Arch);
+  `release/stage.sh` кладёт `hooks/` в tarball.
+- Компактный GUI под 7" @ scale 2.1 (жалоба «всё громоздкое»): база — live-версия
+  (там же click-always/1s-settle правки, которых не было в репо), поверх компакт-пасс:
+  body 13→12px, timer 24→20, h1 15→14, power 64→54, mode-кнопки 34→28, sidebar 58→46,
+  окно 700×660→820×620 (кламп по availableGeometry), серверная сетка плотнее —
+  список серверов снова виден в окне, а не «полоска».
+- Repo↔live свели: `.full-since` вернулся в репо-toggle (нужен tunnel-guard'у,
+  жил только на хосте); `SB` fallback из reposerver.sh уехал на хост.
+- Игровой режим: journal plugin_loader за 27.09 — `vpn_down` 0 за день, `vpn_up`→CONNECTED
+  (18:31, ещё в игре) — закрытие QAM-панели VPN не глушит (старый симптом показа был
+  починен в v0.1.6); сегодняшняя «полная неработоспособность» = общая поломка caps.
+- Пруфы: pacman-hook вывод + getcap; status-json CONNECTED; grab-скриншот окна (vision);
+  QA static suite; validate.sh --strict PASS (specs/032-vpn-caps-and-compact-ui).
+
 ## 2026-09-23 (55) — CachyOS: инсталлер доведён до [7/7]; sing-box path; регресс toggle
 
 - Релиз v0.1.7: https://github.com/M501/neodon-vpn/releases/tag/v0.1.7 (tarball + sha256; скачан с GitHub на CachyOS и сверен).

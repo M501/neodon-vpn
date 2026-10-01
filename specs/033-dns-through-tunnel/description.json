@@ -1,0 +1,16 @@
+{
+ "description": "DNS резолв через туннель: починить недоступность блокируемых сайтов при включённом VPN",
+ "folderSlug": "dns-through-tunnel",
+ "keywords": [
+  "dns",
+  "through",
+  "tunnel"
+ ],
+ "lastUpdated": "2026-10-01T13:46:58Z",
+ "level": "2",
+ "memoryNameHistory": [],
+ "memorySequence": 0,
+ "parentChain": [],
+ "specFolder": "033-dns-through-tunnel",
+ "specId": "033"
+}
