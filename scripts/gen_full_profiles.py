@@ -196,7 +196,7 @@ def build_profile(pid, gproxy, direct_specs, proxy_specs, geo, prov_sfx, prov_kw
         {"ip_cidr": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
                      "127.0.0.0/8", "169.254.0.0/16", "fc00::/7",
                      "fe80::/10"], "outbound": "direct"},
-        {"process_name": ["qbittorrent", "steam", "steamwebhelper", "reaper"],
+        {"process_name": ["qbittorrent", "steam", "reaper"],
          "outbound": "direct"},
         {"domain_suffix": list(EXTRA_DIRECT_STEAM_HF), "outbound": "direct"},
         {"domain_suffix": list(EXTRA_DIRECT_OZON), "outbound": "direct"},

@@ -123,7 +123,7 @@ def build_route_rules(provider_cfg, preset_rules=None):
     # private IPs direct
     rules.append({"ip_cidr": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "169.254.0.0/16", "fc00::/7", "fe80::/10"], "outbound": "direct"})
     # process direct
-    rules.append({"process_name": ["qbittorrent", "steam", "steamwebhelper", "reaper"], "outbound": "direct"})
+    rules.append({"process_name": ["qbittorrent", "steam", "reaper"], "outbound": "direct"})
     # ozon direct (critical)
     rules.append({"domain_suffix": ["ozon.ru", "ozone.ru", "ozonusercontent.com"], "outbound": "direct"})
     # bittorrent direct
