@@ -22,6 +22,14 @@ if [ "$running" = 0 ]; then
   exec bash "$SBOX/neodon-heal.sh"
 fi
 
+# NM-guard (2026-10-02): probes are meaningless while the network is going
+# down/up (sleep teardown, wifi reassociation). Never count those as dead.
+nmstate=$(nmcli -t -f DEVICE,STATE device 2>/dev/null | awk -F: '$1=="wlan0"{print $2}')
+if [ "$nmstate" != "connected" ]; then
+  rm -f "$FAILSTATE"
+  exit 0
+fi
+
 # живой туннель: следим только за fail-closed (full) — остальные режимы
 # при мёртвом сервере оставляют прямой интернет живым
 if [ "$mode" != "full" ]; then rm -f "$FAILSTATE"; exit 0; fi

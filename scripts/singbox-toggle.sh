@@ -14,7 +14,7 @@ case "$1" in
 esac
 TRANS_MARKER=~/AI/singbox/.transitioning
 notify() { :; }  # owner 2026-09-08: desktop popup spam off
-set_mode() { echo "$1" > "$MODE_FILE"; }
+set_mode() { echo "$1" > "$MODE_FILE"; echo "$1" > "$HOME/AI/singbox/.desired"; }
 wd_reset() { python3 -c 'import json,time,os;f=os.path.expanduser("~/AI/singbox/watchdog-state.json");d=json.load(open(f));d.update({"consecutive_failures":0,"backoff_index":0,"next_due_ts":int(time.time()),"watchdog_status":"ok"});json.dump(d,open(f,"w"))'; }
 fw_flush() { bash ~/AI/singbox/killswitch.sh remove >/dev/null 2>&1 || true; }
 stop_all() {

@@ -53,7 +53,10 @@ function Content() {
       const st: any = un(sres);
       const ok: boolean = !!st?.ok;
       const actual: string = st?.actual_state || "?";
-      const nowOn: boolean = ok && actual === "CONNECTED";
+      const dm: string = st?.desired_mode || "smart";
+      // DEGRADED (servers flaking, system retrying) must not read as OFF:
+      // the switch shows intent; the honest state is in the status line.
+      const nowOn: boolean = ok && (actual === "CONNECTED" || (actual === "DEGRADED" && dm !== "off"));
       // Quiet window: while our own command is in flight, keep showing the
       // commanded position instead of flapping with half-done backend truth.
       const quiet: boolean =
@@ -70,7 +73,6 @@ function Content() {
       } else {
         sinceRef.current = 0;
       }
-      const dm: string = st?.desired_mode || "smart";
       setMode(dm === "full" ? "full" : "smart");
       const ip: string = st?.exit_ip || "—";
       setMeta(actual + " · " + ip);

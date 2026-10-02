@@ -80,6 +80,10 @@ def build_outbound(cfg):
             if ts.get("alpn"):
                 out["tls"]["alpn"] = ts.get("alpn")
         # security none -> no tls
+        # Bootstrap resolver for the proxy server's own domain: plain DNS.
+        # route.default_domain_resolver is "remote" (DoT through the proxy) — without
+        # this per-outbound override the proxy could not resolve itself (loop).
+        out["domain_resolver"] = "local"
         return out
     raise ValueError("no vless outbound found")
 
@@ -188,7 +192,7 @@ def build_config(outbound, provider_cfg, with_tun, with_mixed, preset_final="pro
             "rules": [],
             "final": preset_final,
             "auto_detect_interface": True,
-            "default_domain_resolver": "local"
+            "default_domain_resolver": "remote"
         }
     }
     if with_mixed:
@@ -207,7 +211,7 @@ def build_config(outbound, provider_cfg, with_tun, with_mixed, preset_final="pro
             "mtu": 9000,
             "auto_route": True,
             "strict_route": False,
-            "stack": "system"
+            "stack": "gvisor"
         })
     # route rules
     # For full (tun only) with preset_final proxy, we want minimal rules: just private/bypass + final proxy (ignore presets)

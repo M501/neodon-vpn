@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = sing-box
+
+[Action]
+Description = Neodon VPN: restore cap_net_admin,cap_net_raw on sing-box binary (TUN needs it)
+When = PostTransaction
+Exec = /usr/bin/setcap cap_net_admin,cap_net_raw=ep /usr/bin/sing-box

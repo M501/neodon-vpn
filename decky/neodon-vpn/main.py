@@ -218,7 +218,10 @@ def parse_userinfo(line):
     used = up + down
     gb = lambda b: round(b / (1024 ** 3), 1)
     pct = round(used / total * 100) if total > 0 else 0
-    exp = datetime.datetime.fromtimestamp(expire).strftime("Active until: %d %b %Y %H:%M")
+    _t = datetime.datetime.fromtimestamp(expire)
+    _mon = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")[_t.month - 1]
+    exp = "Active until: %02d %s %d %02d:%02d" % (_t.day, _mon, _t.year, _t.hour, _t.minute)
     return {"pct": pct, "used": "%s GB / %s GB" % (gb(used), gb(total)),
             "expire": exp, "ts": int(datetime.datetime.now().timestamp())}
 

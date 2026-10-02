@@ -971,3 +971,8 @@
 
 ### Известное
 - Серверы [4] DE (g1.confstage.app, grpc/tls) и [6] RU (con.3, reality) не отвечают со стороны провайдера — 9/11 рабочих.
+
+### 2026-10-02: VPN переживает сон/крэш/ребут ("desired-intent" + NM-guard + resume-dispatcher)
+- `singbox-toggle.sh`: `set_mode` теперь пишет и `~/.desired` (намерение пользователя; `off` — при явном выключении; heal/ExecStopPost его не трогает).
+- `neodon-watchdog.sh`: NM-guard — пробы не считаются «интернет умер», пока wlan0 не `connected` (засыпание/реассоциация больше не вырубает VPN).
+- Новый `/etc/NetworkManager/dispatcher.d/90-neodon-resume` (repo: `scripts/90-neodon-resume.dispatcher`): после up/connectivity-change (вкл. пробуждение) восстанавливает VPN по `~/.desired`, если сервис не активен. Проверено живьём 02.10: crash-sim → restore → CONNECTED (exit 94.183.209.98).

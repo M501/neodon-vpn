@@ -244,7 +244,7 @@ def icon_pixmap(name, size=22, color="#9B9BA5"):
 QSS = """
 * { font-family: 'Inter', 'Segoe UI', 'DejaVu Sans', sans-serif; }
 QMainWindow, QDialog, #root { background: #0F0F13; }
-QWidget { color: #F5F5F7; font-size: 13px; }
+QWidget { color: #F5F5F7; font-size: 12px; }
 #sidebar { background: #17171C; border-right: 1px solid #26262E; }
 #sidebarBtn { border: none; border-radius: 10px; background: transparent; }
 #sidebarBtn:hover { background: #26262E; }
@@ -253,12 +253,12 @@ QWidget { color: #F5F5F7; font-size: 13px; }
 #page { background: #0F0F13; }
 #card { background: #17171C; border: 1px solid #26262E; border-radius: 14px; }
 #card:hover { border-color: #33333D; }
-#title { font-size: 12px; font-weight: 700; color: #9B9BA5; letter-spacing: 1px; }
-#h1 { font-size: 15px; font-weight: 700; color: #F5F5F7; }
-#h2 { font-size: 13px; font-weight: 600; color: #F5F5F7; }
+#title { font-size: 11px; font-weight: 700; color: #9B9BA5; letter-spacing: 1px; }
+#h1 { font-size: 14px; font-weight: 700; color: #F5F5F7; }
+#h2 { font-size: 12px; font-weight: 600; color: #F5F5F7; }
 #muted { color: #9B9BA5; }
-#timer { font-size: 27px; font-weight: 800; color: #F5F5F7; font-family: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace; }
-QPushButton { border: none; border-radius: 10px; padding: 8px 14px; font-weight: 600; background: #26262E; color: #F5F5F7; }
+#timer { font-size: 20px; font-weight: 800; color: #F5F5F7; font-family: 'JetBrains Mono', 'Cascadia Mono', 'DejaVu Sans Mono', monospace; }
+QPushButton { border: none; border-radius: 10px; padding: 6px 12px; font-weight: 600; background: #26262E; color: #F5F5F7; }
 QPushButton:hover { background: #33333D; }
 QPushButton:pressed { background: #1F1F26; }
 QPushButton:disabled { color: #6B6B76; background: #1A1A20; }
@@ -268,14 +268,14 @@ QPushButton:disabled { color: #6B6B76; background: #1A1A20; }
 #ghost:hover { color: #F5F5F7; border-color: #4A4A55; }
 #danger { background: #E5484D; color: #FFF; }
 #danger:hover { background: #C93A3F; }
-#powerBtn { border-radius: 42px; background: #26262E; border: 2px solid #33333D; }
+#powerBtn { border-radius: 26px; background: #26262E; border: 2px solid #33333D; }
 #powerBtn:hover { border-color: #4A4A55; }
 #powerBtn:checked { background: #2A5FD8; border-color: #3373F7; }
-#modeOn { background: #3373F7; color: #FFFFFF; min-height: 40px; font-size: 13px; font-weight: 700; border-radius: 10px; }
+#modeOn { background: #3373F7; color: #FFFFFF; min-height: 28px; font-size: 12px; font-weight: 700; border-radius: 10px; }
 #modeOn:hover { background: #2A5FD8; }
-#modeOff { background: #1F1F26; color: #9B9BA5; min-height: 40px; font-size: 13px; font-weight: 700; border-radius: 10px; }
+#modeOff { background: #1F1F26; color: #9B9BA5; min-height: 28px; font-size: 12px; font-weight: 700; border-radius: 10px; }
 #modeOff:hover { background: #26262E; color: #F5F5F7; }
-#statusPill { border-radius: 14px; padding: 6px 16px; font-weight: 700; font-size: 13px; }
+#statusPill { border-radius: 12px; padding: 3px 10px; font-weight: 700; font-size: 12px; }
 #statusOff { background: #26262E; color: #9B9BA5; }
 #statusOk { background: #1C3D2E; color: #4ADE80; }
 #statusWarn { background: #3D2E1C; color: #F5A524; }
@@ -285,28 +285,28 @@ QPushButton:disabled { color: #6B6B76; background: #1A1A20; }
 #rowCard { background: #17171C; border: 1px solid #26262E; border-radius: 12px; }
 #rowCard:hover { background: #1F1F26; border-color: #33333D; }
 #rowCardActive { background: #17171C; border: 2px solid #3373F7; border-radius: 12px; }
-#badge { background: #1F1F26; border: 1px solid #33333D; border-radius: 14px; color: #3373F7; font-size: 13px; font-weight: 700; }
+#badge { background: #1F1F26; border: 1px solid #33333D; border-radius: 12px; color: #3373F7; font-size: 12px; font-weight: 700; }
 #activeTag { color: #4ADE80; font-weight: 700; font-size: 12px; }
-QProgressBar { background: #1F1F26; border: none; border-radius: 5px; min-height: 10px; max-height: 10px; text-align: center; color: transparent; }
+QProgressBar { background: #1F1F26; border: none; border-radius: 4px; min-height: 8px; max-height: 8px; text-align: center; color: transparent; }
 QProgressBar::chunk { background: #3373F7; border-radius: 5px; }
 QListWidget { background: transparent; border: none; outline: 0; }
 QListWidget::item { border-radius: 10px; }
 QListWidget::item:selected { background: #26262E; }
 QScrollArea { background: transparent; border: none; }
 QScrollArea > QWidget > QWidget { background: transparent; }
-QScrollBar:vertical { background: transparent; width: 8px; }
+QScrollBar:vertical { background: transparent; width: 6px; }
 QScrollBar::handle:vertical { background: #33333D; border-radius: 4px; min-height: 24px; }
 QScrollBar::add-line, QScrollBar::sub-line { height: 0; }
-QComboBox { background: #1F1F26; border: 1px solid #33333D; border-radius: 10px; padding: 7px 12px; }
+QComboBox { background: #1F1F26; border: 1px solid #33333D; border-radius: 10px; padding: 5px 10px; }
 QComboBox::drop-down { border: none; width: 24px; }
 QComboBox QAbstractItemView { background: #1F1F26; border: 1px solid #33333D; selection-background-color: #2A5FD8; }
-QLineEdit { background: #1F1F26; border: 1px solid #33333D; border-radius: 10px; padding: 8px 12px; }
-QPlainTextEdit { background: #0B0B0E; border: 1px solid #26262E; border-radius: 10px; color: #9B9BA5; font-family: 'Cascadia Mono', 'JetBrains Mono', monospace; font-size: 11px; }
+QLineEdit { background: #1F1F26; border: 1px solid #33333D; border-radius: 10px; padding: 6px 10px; }
+QPlainTextEdit { background: #0B0B0E; border: 1px solid #26262E; border-radius: 10px; color: #9B9BA5; font-family: 'Cascadia Mono', 'JetBrains Mono', monospace; font-size: 10px; }
 QCheckBox { spacing: 8px; }
-QCheckBox::indicator { width: 18px; height: 18px; border-radius: 5px; border: 1px solid #4A4A55; background: #16161E; }
+QCheckBox::indicator { width: 16px; height: 16px; border-radius: 5px; border: 1px solid #4A4A55; background: #16161E; }
 QCheckBox::indicator:hover { border-color: #3373F7; }
 QCheckBox::indicator:checked { background: #3373F7; border-color: #3373F7; }
-#hint { color: #6B6B76; font-size: 12px; }
+#hint { color: #6B6B76; font-size: 11px; }
 """
 
 # ---------------------------------------------------------------------------
@@ -516,7 +516,10 @@ def sub_used_pct(info):
 def sub_expire(info):
     if not info or info.get("expire", 0) <= 0:
         return "Active until: —"
-    return "Active until: " + time.strftime("%d %b %Y %H:%M", time.localtime(info["expire"]))
+    t = time.localtime(info["expire"])
+    mon = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")[t.tm_mon - 1]
+    return "Active until: %02d %s %d %02d:%02d" % (t.tm_mday, mon, t.tm_year, t.tm_hour, t.tm_min)
 
 
 # ---------------------------------------------------------------------------
@@ -612,7 +615,7 @@ def _fast_poll_wanted(new_state, deadline, now):
 # ---------------------------------------------------------------------------
 
 class IconButton(QPushButton):
-    def __init__(self, icon_name, size=22, color="#9B9BA5", parent=None, checkable=False,
+    def __init__(self, icon_name, size=18, color="#9B9BA5", parent=None, checkable=False,
                  checked_color="#FFFFFF", object_name="sidebarBtn", tip=None):
         super().__init__(parent)
         self._icon_name = icon_name
@@ -622,7 +625,7 @@ class IconButton(QPushButton):
         self.setCheckable(checkable)
         if tip:
             self.setToolTip(tip)
-        self.setFixedSize(46, 46)
+        self.setFixedSize(38, 38)
         self.setIconSize(QSize(size, size))
         self._apply_icon()
 
@@ -743,14 +746,15 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Neodon VPN")
         # adaptive: fit the available (logical) screen — small handhelds run scale 2.1
         scr0 = QApplication.primaryScreen()
-        _w, _h = 700, 660
+        _w, _h = 820, 620
         if scr0 is not None:
             _av = scr0.availableGeometry()
             _w = min(_w, max(420, _av.width() - 12))
             _h = min(_h, max(420, _av.height() - 12))
         self.resize(_w, _h)
-        self.setMinimumSize(420, 440)
+        self.setMinimumSize(420, 380)
         self._restore_geom()
+        self._fit_once()
         self.servers = []
         self.lats = {}
         self._workers = []
@@ -800,9 +804,9 @@ class MainWindow(QMainWindow):
         # sidebar
         side = QWidget()
         side.setObjectName("sidebar")
-        side.setFixedWidth(58)
+        side.setFixedWidth(46)
         sl = QVBoxLayout(side)
-        sl.setContentsMargins(6, 10, 6, 10)
+        sl.setContentsMargins(4, 8, 4, 8)
         sl.setSpacing(6)
         self.nav_btns = {}
         for key, icon, tip in (("home", "home", "Home"),
@@ -854,7 +858,7 @@ class MainWindow(QMainWindow):
         outer = QVBoxLayout(w)
         outer.setContentsMargins(0, 0, 0, 0)
         hdr = QHBoxLayout()
-        hdr.setContentsMargins(14, 12, 14, 4)
+        hdr.setContentsMargins(12, 8, 12, 2)
         t = QLabel(title)
         t.setObjectName("h1")
         hdr.addWidget(t)
@@ -868,14 +872,14 @@ class MainWindow(QMainWindow):
             body.setFrameShape(QFrame.Shape.NoFrame)
             cont = QWidget()
             bl = QVBoxLayout(cont)
-            bl.setContentsMargins(10, 4, 10, 10)
-            bl.setSpacing(8)
+            bl.setContentsMargins(8, 2, 8, 6)
+            bl.setSpacing(5)
             body.setWidget(cont)
             outer.addWidget(body, 1)
             return w, bl
         bl = QVBoxLayout()
-        bl.setContentsMargins(10, 4, 10, 10)
-        bl.setSpacing(8)
+        bl.setContentsMargins(8, 2, 8, 6)
+        bl.setSpacing(5)
         outer.addLayout(bl, 1)
         return w, bl
 
@@ -892,9 +896,9 @@ class MainWindow(QMainWindow):
 
         self.power = QPushButton()
         self.power.setObjectName("powerBtn")
-        self.power.setFixedSize(64, 64)
+        self.power.setFixedSize(54, 54)
         self.power.setCheckable(True)
-        self.power.setIconSize(QSize(26, 26))
+        self.power.setIconSize(QSize(22, 22))
         self.power.setCursor(Qt.CursorShape.PointingHandCursor)
         self.power.clicked.connect(self.on_power)
         hb = QHBoxLayout()
@@ -931,11 +935,6 @@ class MainWindow(QMainWindow):
         mrow.addWidget(self.btn_tunnel)
         ml.addLayout(mrow)
 
-        # карточки Traffic rules / Routing
-        tr = self._row_card(bl, "folder", "Traffic rules", "Community rule presets",
-                            lambda: self.navigate("traffic"))
-        # Routing убран: дубль Traffic rules (фиктивный дубликат)
-
         # серверы
         sc, sl = self._card(bl, "SERVERS")
         subrow = QHBoxLayout()
@@ -946,7 +945,7 @@ class MainWindow(QMainWindow):
         self.sub_refresh_btn = QPushButton()
         self.sub_refresh_btn.setIcon(QIcon(icon_pixmap("refresh", 18, "#9B9BA5")))
         self.sub_refresh_btn.setObjectName("ghost")
-        self.sub_refresh_btn.setFixedSize(30, 30)
+        self.sub_refresh_btn.setFixedSize(26, 26)
         self.sub_refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.sub_refresh_btn.setToolTip("Refresh subscription")
         self.sub_refresh_btn.clicked.connect(self.refresh_sub)
@@ -982,9 +981,13 @@ class MainWindow(QMainWindow):
         self.srv_container = QWidget()
         self.srv_grid = QGridLayout(self.srv_container)
         self.srv_grid.setContentsMargins(0, 0, 0, 0)
-        self.srv_grid.setSpacing(8)
+        self.srv_grid.setSpacing(6)
         self.srv_grid.setAlignment(Qt.AlignmentFlag.AlignTop)
         sl.addWidget(self.srv_container)
+
+        # карточки Traffic rules (ниже серверов: подбор сервера — частый сценарий)
+        tr = self._row_card(bl, "folder", "Traffic rules", "Community rule presets",
+                            lambda: self.navigate("traffic"))
 
         hint = QLabel("Click a server to connect or switch. If VPN is down — switch server or press ↻.")
         hint.setObjectName("hint")
@@ -997,8 +1000,8 @@ class MainWindow(QMainWindow):
         frame = QFrame()
         frame.setObjectName("card")
         lay = QVBoxLayout(frame)
-        lay.setContentsMargins(14, 10, 14, 12)
-        lay.setSpacing(8)
+        lay.setContentsMargins(10, 6, 10, 8)
+        lay.setSpacing(5)
         t = QLabel(title)
         t.setObjectName("title")
         lay.addWidget(t)
@@ -1012,10 +1015,10 @@ class MainWindow(QMainWindow):
         btn.setObjectName("rowCard")
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         hl = QHBoxLayout(btn)
-        hl.setContentsMargins(12, 12, 12, 12)
-        hl.setSpacing(10)
+        hl.setContentsMargins(10, 8, 10, 8)
+        hl.setSpacing(8)
         ic = QLabel()
-        ic.setPixmap(icon_pixmap(icon, 20, "#3373F7"))
+        ic.setPixmap(icon_pixmap(icon, 18, "#3373F7"))
         hl.addWidget(ic)
         v = QVBoxLayout()
         t = QLabel(title)
@@ -1063,8 +1066,8 @@ class MainWindow(QMainWindow):
             b.setObjectName("rowCard")
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             hl = QHBoxLayout(b)
-            hl.setContentsMargins(12, 10, 12, 10)
-            hl.setSpacing(10)
+            hl.setContentsMargins(10, 6, 10, 6)
+            hl.setSpacing(8)
             ipath, ifallback = preset_icon(pid)
             px = card_pixmap(ipath) if ipath else None
             if px is None:
@@ -1073,7 +1076,7 @@ class MainWindow(QMainWindow):
             else:
                 ic = QLabel()
                 ic.setPixmap(px)
-            ic.setFixedSize(28, 28)
+            ic.setFixedSize(24, 24)
             ic.setAlignment(Qt.AlignmentFlag.AlignCenter)
             hl.addWidget(ic)
             v = QVBoxLayout()
@@ -1101,12 +1104,12 @@ class MainWindow(QMainWindow):
             v.addWidget(act)
             hl.addLayout(v, 1)
             info_btn = QPushButton(">")
-            info_btn.setFixedSize(30, 30)
+            info_btn.setFixedSize(26, 26)
             info_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             info_btn.clicked.connect(lambda _=False, p=pid: self.preset_details(p))
             hl.addWidget(info_btn)
             rb = QLabel()
-            rb.setFixedSize(18, 18)
+            rb.setFixedSize(16, 16)
             hl.addWidget(rb)
             self.preset_btns[pid] = (b, rb, act)
             bl.addWidget(b)
@@ -1345,7 +1348,9 @@ class MainWindow(QMainWindow):
             b.setObjectName("modeOn" if mode == on_mode else "modeOff")
             b.style().unpolish(b)
             b.style().polish(b)
-        if restart and changed and (self.connected or self.state not in ("OFF", "STOPPING")):
+        if restart and (changed or self.state == "OFF"):
+            # клик по режиму всегда работает: включён → переключает,
+            # выключен (OFF) → включает (даже если режим уже выбран)
             self._request_op("toggle", mode)
         elif mode in ("smart", "full"):
             self.desired = mode
@@ -1359,14 +1364,9 @@ class MainWindow(QMainWindow):
         self.power.setIcon(QIcon(icon_pixmap("power", self.power.iconSize().width(), "#F5F5F7")))
 
     def on_power(self):
-        try:
-            if time.monotonic() < getattr(self, "_settle_until", 0):
-                # bounce guard: a second tap right after an op finished would
-                # flip it back before the UI even updated (short window).
-                self.statusBar().showMessage("Last op just finished — wait…", 1500)
-                return
-        except RuntimeError:
-            pass
+        # NOTE: нет settle-игнора — пресc во время догоняющего обновления UI
+        # раньше молча съедался («нажимаю — не даёт»). Теперь клик всегда проходит:
+        # занято → очередь last-wins (_request_op), свободно → выполняется сразу.
         # Decide against INTENT (in-flight/queued target), not stale UI state:
         # pressing OFF 1s after ON must queue OFF, not a second ON.
         if self._pending:
@@ -1410,7 +1410,7 @@ class MainWindow(QMainWindow):
         self._target = mode
         self._fast_poll_until = time.monotonic() + 12
         try:
-            self.set_state("TRANSITIONING")
+            self.set_state("STOPPING" if mode == "off" else "TRANSITIONING")
         except RuntimeError:
             pass
         w = ToggleWorker(mode)
@@ -1420,7 +1420,7 @@ class MainWindow(QMainWindow):
 
     def _toggle_done(self, ok, out):
         self._op_in_progress = False
-        self._settle_until = time.monotonic() + 5
+        self._settle_until = time.monotonic() + 1
         self.statusBar().showMessage(out or ("Done" if ok else "Error"), 6000)
         self.poll_status()
         self._drain_pending()
@@ -1614,7 +1614,7 @@ class MainWindow(QMainWindow):
             self._journal_transition(_cur, _new, d)
         try:
             if _fast_poll_wanted(_new, getattr(self, "_fast_poll_until", 0), time.monotonic()):
-                QTimer.singleShot(1500, self.poll_status)
+                QTimer.singleShot(500, self.poll_status)
         except RuntimeError:
             pass
         self.state = _new
@@ -1675,6 +1675,41 @@ class MainWindow(QMainWindow):
         else:
             self.state_meta.setText("")
             self.timer_lbl.setText("00:00:00")
+
+    def _fit_once(self):
+        """One-time: legacy saved geometry (pre-compact UI) opens so small that
+        the server list is off-screen. Bump to the adaptive fit once, then
+        remember the user's own size (marker fit_v2 in gui-state.json)."""
+        p = os.path.join(STATE_DIR, "gui-state.json")
+        try:
+            with open(p) as f:
+                st = json.load(f)
+        except (OSError, ValueError):
+            st = {}
+        if st.get("fit_v2"):
+            return
+        try:
+            scr = self.screen() or QApplication.primaryScreen()
+            if scr is not None:
+                avail = scr.availableGeometry()
+                w = min(820, max(420, avail.width() - 12))
+                h = min(620, max(420, avail.height() - 12))
+                self.resize(w, h)
+                self.move(avail.x() + max(0, (avail.width() - w) // 2),
+                          avail.y() + max(0, (avail.height() - h) // 2))
+        except RuntimeError:
+            pass
+        try:
+            st["fit_v2"] = True
+            with open(p + ".tmp", "w") as f:
+                json.dump(st, f)
+            os.replace(p + ".tmp", p)
+        except OSError:
+            pass
+        try:
+            self._save_geom()
+        except RuntimeError:
+            pass
 
     def _save_geom(self):
         try:
@@ -1771,8 +1806,8 @@ class MainWindow(QMainWindow):
             row.setObjectName("serverCard")
             row.setCursor(Qt.CursorShape.PointingHandCursor)
             hl = QHBoxLayout(row)
-            hl.setContentsMargins(10, 8, 10, 8)
-            hl.setSpacing(10)
+            hl.setContentsMargins(8, 4, 8, 4)
+            hl.setSpacing(6)
             fl = QLabel()
             pix = flag_pixmap(code)
             if pix is not None:
@@ -1780,7 +1815,7 @@ class MainWindow(QMainWindow):
             else:
                 fl.setText("●")
                 fl.setStyleSheet("color:#33333D; font-size:14px;")
-            fl.setFixedWidth(36)
+            fl.setFixedWidth(26)
             hl.addWidget(fl)
             head = re.sub(r"^\[[A-Za-z0-9]{2,4}\]\s*", "", strip_flags(remark).strip()) or ("Server %d" % (i + 1))
             active = bool(self.active_addr) and s.get("address") == self.active_addr
@@ -1796,7 +1831,7 @@ class MainWindow(QMainWindow):
             txv.addWidget(desc_lbl)
             hl.addLayout(txv, 1)
             lat_lbl = QLabel()
-            lat_lbl.setFixedWidth(64)
+            lat_lbl.setFixedWidth(52)
             lat_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             hl.addWidget(lat_lbl)
             self._srv_lat[i] = lat_lbl
@@ -1887,7 +1922,7 @@ class MainWindow(QMainWindow):
 
     def _select_done(self, ok, out):
         self._op_in_progress = False
-        self._settle_until = time.monotonic() + 5
+        self._settle_until = time.monotonic() + 1
         if ok:
             self.statusBar().showMessage("Server switched", 4000)
             self.refresh_active_server()

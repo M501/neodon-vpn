@@ -1,0 +1,18 @@
+{
+ "description": "Починить VPN после апгрейда пакета (caps+sentinel) и сжать GUI под 7-дюймовый экран при scale 2.1; свести расхождения repo vs live host",
+ "folderSlug": "vpn-caps-and-compact-ui",
+ "keywords": [
+  "vpn",
+  "caps",
+  "and",
+  "compact",
+  "ui"
+ ],
+ "lastUpdated": "2026-09-27T18:43:39Z",
+ "level": "2",
+ "memoryNameHistory": [],
+ "memorySequence": 0,
+ "parentChain": [],
+ "specFolder": "032-vpn-caps-and-compact-ui",
+ "specId": "032"
+}
