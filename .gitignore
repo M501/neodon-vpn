@@ -14,3 +14,4 @@ geosite.db
 .selected-server.json
 qa-results/
 .pytest_cache/
+node_modules/
