@@ -87,7 +87,7 @@ def _read_json(path):
 
 async def get_status():
     """Live backend state (same oracle as the Desktop pill)."""
-    rc, out, _ = await _run(["bash", TOGGLE, "status-json"], 15)
+    rc, out, _ = await _run(["bash", TOGGLE, "status-json"], 30)
     if rc != 0:
         return {"ok": False, "error": out[-200:] if out else "status failed"}
     try:

@@ -14,10 +14,22 @@ running=0
 for u in sing-box.service sing-box-full.service sing-box-proxy.service; do
   st=$(systemctl --user is-active "$u" 2>/dev/null)
   case "$st" in active|activating|reloading|auto-restart) running=1;; esac
+  sub=$(systemctl --user show -p SubState --value "$u" 2>/dev/null)
+  case "$sub" in auto-restart) running=1;; esac
 done
 if [ "$running" = 1 ]; then
   echo "heal: tunnel busy — nothing to do"
   exit 0
+fi
+# restart-in-flight guard: ExecStopPost fires between stop and start of an
+# explicit `systemctl restart` — a fresh transition marker means the tunnel
+# is coming back, not gone (otherwise .mode/resolv got wiped mid-server-switch).
+if [ -f "$SBOX/.transitioning" ]; then
+  _age=$(( $(date +%s) - $(stat -c %Y "$SBOX/.transitioning" 2>/dev/null || echo 0) ))
+  if [ "$_age" -le 20 ]; then
+    echo "heal: restart in flight (marker ${_age}s old) — skip"
+    exit 0
+  fi
 fi
 
 did=""

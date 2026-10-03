@@ -24,9 +24,10 @@ stop_all() {
 }
 case "$1" in
   smart|full|proxy|off)
-    touch "$TRANS_MARKER"
-    # internet-first: любой тоггл сначала убирает следы прошлого сбоя
+    # internet-first: сначала убираем следы прошлого сбоя, потом маркер
+    # (heal пропускает работу при свежем маркере — «переключение в полёте»)
     bash ~/AI/singbox/neodon-heal.sh >/dev/null 2>&1 || true
+    touch "$TRANS_MARKER"
     ;;
 esac
 case "$1" in
@@ -112,7 +113,7 @@ status-json)
     _fw_dump=""; fw_rules=0; locked=false
     case "$desired" in
       full|off)
-        _fw_dump=$(sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null || true)
+        _fw_dump=$(timeout 5 sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null || true)
         fw_rules=$(echo "$_fw_dump" | wc -l)
         echo "$_fw_dump" | grep -q 'filter OUTPUT_direct 20 ' && locked=true ;;
     esac
@@ -121,17 +122,17 @@ status-json)
     exit_ip=""
     case "$desired" in
       full|smart) if [ "$tun_up" = true ]; then
-          exit_ip=$(curl -s -m $em https://api.ipify.org 2>/dev/null)
+          exit_ip=$(timeout 5 curl -s -m $em https://api.ipify.org 2>/dev/null)
           # slow retry only when the fast probe failed AND not mid-transition
           # (busy torrents make 2-3s probes flaky; a single miss must not flap DEGRADED)
           if [ -z "$exit_ip" ] && [ ! -f "$TRANS_MARKER" ]; then
-            exit_ip=$(curl -s -m 6 https://api.ipify.org 2>/dev/null)
+            exit_ip=$(timeout 7 curl -s -m 6 https://api.ipify.org 2>/dev/null)
           fi
         else exit_ip=""; fi ;;
       proxy) if (echo > /dev/tcp/127.0.0.1/10808) 2>/dev/null; then
-          exit_ip=$(curl -s -m $em -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null)
+          exit_ip=$(timeout 5 curl -s -m $em -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null)
           if [ -z "$exit_ip" ] && [ ! -f "$TRANS_MARKER" ]; then
-            exit_ip=$(curl -s -m 6 -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null)
+            exit_ip=$(timeout 7 curl -s -m 6 -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null)
           fi
         else exit_ip=""; fi ;;
     esac
@@ -183,7 +184,7 @@ status-json)
       fi
     fi
     PROFILE="$(cat "$HOME/AI/singbox/.profile" 2>/dev/null || echo default)"
-    read -r wd_status wd_fails wd_next < <(python3 - <<'EOF' 2>/dev/null
+    read -r wd_status wd_fails wd_next < <(timeout 2 python3 - <<'EOF' 2>/dev/null
 import json, os
 try:
     d = json.load(open(os.path.expanduser('~/AI/singbox/watchdog-state.json')))
@@ -203,8 +204,8 @@ EOF
     else
       rm -f "$TRANS_MARKER"
     fi
-    server_tag=$(python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/AI/singbox/selected-server.json"))).get("tag",""))' 2>/dev/null)
-    lat=$(python3 - <<'EOF' 2>/dev/null
+    server_tag=$(timeout 2 python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/AI/singbox/selected-server.json"))).get("tag",""))' 2>/dev/null)
+    lat=$(timeout 3 python3 - <<'EOF' 2>/dev/null
 import json, os, socket, time
 try:
     cfg = json.load(open(os.path.expanduser('~/AI/singbox/config-full.json')))

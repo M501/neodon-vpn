@@ -30,22 +30,25 @@ if [ "$nmstate" != "connected" ]; then
   exit 0
 fi
 
-# живой туннель: следим только за fail-closed (full) — остальные режимы
-# при мёртвом сервере оставляют прямой интернет живым
-if [ "$mode" != "full" ]; then rm -f "$FAILSTATE"; exit 0; fi
+# живой туннель: следим только за TUN-режимами; блэкаут = нет exit-IP
+# И одновременно нет прямого выхода (иначе это просто деградация сервера,
+# при которой обычный интернет жив — выключать VPN тогда нельзя).
+case "$mode" in full|smart) : ;; *) rm -f "$FAILSTATE"; exit 0 ;; esac
 ip link show tun0 >/dev/null 2>&1 || exit 0
 
 exit_ip=$(curl -s -m 6 https://api.ipify.org 2>/dev/null)
 if [ -n "$exit_ip" ]; then rm -f "$FAILSTATE"; exit 0; fi
+direct=$(curl -s -m 6 -o /dev/null -w '%{http_code}' https://ya.ru 2>/dev/null)
+if [ -n "$direct" ] && [ "$direct" != "000" ]; then rm -f "$FAILSTATE"; exit 0; fi
 
 fails=$(cat "$FAILSTATE" 2>/dev/null || echo 0)
 fails=$((fails + 1)); echo "$fails" > "$FAILSTATE"
 if [ "$fails" -lt 3 ]; then
-  echo "watchdog: full-tunnel probe failed ($fails/3)"
+  echo "watchdog: no internet ($fails/3) — exit-probe and direct-probe both dead"
   exit 0
 fi
-printf '%s WATCHDOG: full tunnel dead %s probes -> unlock + OFF (internet first)\n' \
+printf '%s WATCHDOG: internet dead %s probes -> unlock + OFF (internet first)\n' \
   "$(date +%s)" "$fails" >> "$HOME/AI/neodon-vpn/transitions.log"
 bash "$SBOX/singbox-toggle.sh" off >/dev/null 2>&1
 rm -f "$FAILSTATE"
-echo "watchdog: tunnel dead -> OFF"
+echo "watchdog: internet dead -> OFF"

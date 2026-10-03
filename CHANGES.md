@@ -1,3 +1,14 @@
+## 2026-10-04 (59) — смена сервера убивала DNS: domain_resolver + heal-флап + status-таймауты (спека 034)
+
+- Симптом (владелец, 03.10 вечер, Game Mode): «сменил сервер — фейл, ничего не работает; магазин 1/10; выхожу из панели — сам переподключается, счётчик с нуля».
+- Корень №1 (главный): `singbox-server.sh` собирал proxy-outbound БЕЗ `domain_resolver: "local"` — после ЛЮБОЙ смены сервера резолв адреса сервера уходил в петлю через прокси (`DNS query loopback in transport[remote]`), DNS умирал на всей машине. Генератор поле ставил, пикер — нет. Фикс: поле добавлено в `build_outbound`; пикер теперь патчит и `config-proxy.json` (задокументированный пропуск). Пруф: PL CONNECTED за 6 с (exit 94.183.209.100), switch NL — 3 с (exit 203.188.180.46), обратно PL — 6 с (94.183.209.116).
+- Корень №2: `neodon-heal.sh` в ExecStopPost при `systemctl restart` (смена сервера) видел «сервиса нет» и затирал `.mode`→off + resolv прямо в момент перезапуска. Фикс: restart-guard по свежему `.transitioning` (пикер/тоггл ставят маркер ДО рестарта; tоггл: heal теперь ДО маркера) + guard substate auto-restart. Пруф: switch сохраняет `mode=smart`, в transitions нет новых smart-to-off.
+- Корень №3 (усугубитель): `status-json` под отравленным DNS висел >40 с (python-проба latency без границ) → плагин (таймаут 15 с) тонул в «status failed» каждые 5 с. Фикс: все внешние пробы (curl/python/firewall) обёрнуты `timeout`; get_status плагина 15→30 с. Пруф: dead-server статус ~8 с, rc=0.
+- Панель: тумблер следует намерению (`desired_mode`), а не транзитному actual — убит источник фантомных vpn_up/down (Steam echo); таймер не взводится на FAILED/LOCKED.
+- Серверы (перепроверено с этой сети 04.10, изолированный socks-тест): рабочие [0]PL [1]NL [2]AT [3]SW [11]IS; мёртвые [4]DE(g1/grpc) [5]FI(ru1d) [9]US(usin1). Дефолт возвращён на [0] PL.
+- Репо-синк: root `singbox-toggle.sh`/`singbox-server.sh` выровнены с scripts/; `scripts/neodon-watchdog.sh` — порт live (smart+direct-probe); `scripts/neodon-heal.sh` — новая версия.
+- Бэкапы на устройстве: `~/AI/singbox/singbox-toggle.sh.bak-20261004`, `~/AI/backups-neodon-20261004/`.
+
 ## 2026-10-02 — smart: steamwebhelper через VPN
 - Баг: в smart-режиме трафик `steamwebhelper` (веб-часть Steam = магазин Decky, браузер QAM) был `direct` → домен магазина (`plugins.deckbrew.xyz`) из РФ недоступен напрямую → вечный спиннер = «магазин без VPN не работает».
 - Фикс: убран `steamwebhelper` из direct-правила (`qbittorrent/steam/reaper` остаются direct — экономия квоты на игровых загрузках). Правка в `scripts/gen_full_profiles.py` + `scripts/neodon-gen-config.py` (и на устройстве в живом конфиге). Проверено: магазин отдаёт список плагинов (HTTP 200).

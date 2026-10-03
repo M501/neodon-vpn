@@ -121,9 +121,12 @@ function Content() {
             const ok = !!st?.ok;
             const actual = st?.actual_state || "?";
             const dm = st?.desired_mode || "smart";
-            // DEGRADED (servers flaking, system retrying) must not read as OFF:
-            // the switch shows intent; the honest state is in the status line.
-            const nowOn = ok && (actual === "CONNECTED" || (actual === "DEGRADED" && dm !== "off"));
+            // Switch follows INTENT (desired_mode), never a transient actual state:
+            // mid-transition states (TRANSITIONING/FAILED/DEGRADED) must not flip the
+            // switch — a prop flip re-fires Steam's onChange and that phantom call
+            // restarts or kills the service (reconnect churn + clock reset). A failed
+            // poll keeps the last rendered position instead of guessing OFF.
+            const nowOn = ok ? dm !== "off" : seenRef.current;
             // Quiet window: while our own command is in flight, keep showing the
             // commanded position instead of flapping with half-done backend truth.
             const quiet = wantRef.current !== null && Date.now() - wantRef.current.ts < 8000;
@@ -132,8 +135,9 @@ function Content() {
                 seenRef.current = nowOn;
             }
             // Honest clock: backend systemd timestamp wins (survives panel
-            // reopen); local arming is the fallback. Cleared on drop.
-            if (nowOn) {
+            // reopen); local arming is the fallback. Cleared on drop and never
+            // armed while the backend is FAILED/LOCKED.
+            if (nowOn && actual !== "FAILED" && actual !== "LOCKED") {
                 const cs = Number(st?.connected_since || 0);
                 sinceRef.current = cs > 0 ? cs * 1000 : (sinceRef.current || Date.now());
             }
