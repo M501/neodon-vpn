@@ -1,0 +1,17 @@
+{
+ "created_at": "2026-10-03T21:08:41Z",
+ "derived": {
+  "last_active_child_id": null
+ },
+ "files": [
+  "checklist.md",
+  "implementation-summary.md",
+  "plan.md",
+  "spec.md",
+  "tasks.md"
+ ],
+ "level": "2",
+ "schema_version": 2,
+ "specFolder": "034-vpn-status-hardening",
+ "status": "complete"
+}

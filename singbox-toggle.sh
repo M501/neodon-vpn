@@ -14,7 +14,7 @@ case "$1" in
 esac
 TRANS_MARKER=~/AI/singbox/.transitioning
 notify() { :; }  # owner 2026-09-08: desktop popup spam off
-set_mode() { echo "$1" > "$MODE_FILE"; }
+set_mode() { echo "$1" > "$MODE_FILE"; echo "$1" > "$HOME/AI/singbox/.desired"; }
 wd_reset() { python3 -c 'import json,time,os;f=os.path.expanduser("~/AI/singbox/watchdog-state.json");d=json.load(open(f));d.update({"consecutive_failures":0,"backoff_index":0,"next_due_ts":int(time.time()),"watchdog_status":"ok"});json.dump(d,open(f,"w"))'; }
 fw_flush() { bash ~/AI/singbox/killswitch.sh remove >/dev/null 2>&1 || true; }
 stop_all() {
@@ -24,6 +24,9 @@ stop_all() {
 }
 case "$1" in
   smart|full|proxy|off)
+    # internet-first: сначала убираем следы прошлого сбоя, потом маркер
+    # (heal пропускает работу при свежем маркере — «переключение в полёте»)
+    bash ~/AI/singbox/neodon-heal.sh >/dev/null 2>&1 || true
     touch "$TRANS_MARKER"
     ;;
 esac
@@ -34,6 +37,7 @@ case "$1" in
     fw_flush
     bash ~/AI/singbox/dns-fix.sh apply || true
     set_mode full
+    date +%s > "$HOME/AI/singbox/.full-since"
     if ! systemctl --user start sing-box-full.service; then
       echo "FULL FAILED — service start error; firewall state: $(sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null | wc -l) rules; if LOCKED run 'toggle off' to unlock"
       notify "FULL FAILED — service start error (firewall LOCKED)"
@@ -109,7 +113,7 @@ status-json)
     _fw_dump=""; fw_rules=0; locked=false
     case "$desired" in
       full|off)
-        _fw_dump=$(sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null || true)
+        _fw_dump=$(timeout 5 sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null || true)
         fw_rules=$(echo "$_fw_dump" | wc -l)
         echo "$_fw_dump" | grep -q 'filter OUTPUT_direct 20 ' && locked=true ;;
     esac
@@ -118,17 +122,17 @@ status-json)
     exit_ip=""
     case "$desired" in
       full|smart) if [ "$tun_up" = true ]; then
-          exit_ip=$(curl -s -m $em https://api.ipify.org 2>/dev/null)
+          exit_ip=$(timeout 5 curl -s -m $em https://api.ipify.org 2>/dev/null)
           # slow retry only when the fast probe failed AND not mid-transition
           # (busy torrents make 2-3s probes flaky; a single miss must not flap DEGRADED)
           if [ -z "$exit_ip" ] && [ ! -f "$TRANS_MARKER" ]; then
-            exit_ip=$(curl -s -m 6 https://api.ipify.org 2>/dev/null)
+            exit_ip=$(timeout 7 curl -s -m 6 https://api.ipify.org 2>/dev/null)
           fi
         else exit_ip=""; fi ;;
       proxy) if (echo > /dev/tcp/127.0.0.1/10808) 2>/dev/null; then
-          exit_ip=$(curl -s -m $em -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null)
+          exit_ip=$(timeout 5 curl -s -m $em -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null)
           if [ -z "$exit_ip" ] && [ ! -f "$TRANS_MARKER" ]; then
-            exit_ip=$(curl -s -m 6 -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null)
+            exit_ip=$(timeout 7 curl -s -m 6 -x socks5h://127.0.0.1:10808 https://api.ipify.org 2>/dev/null)
           fi
         else exit_ip=""; fi ;;
     esac
@@ -180,7 +184,7 @@ status-json)
       fi
     fi
     PROFILE="$(cat "$HOME/AI/singbox/.profile" 2>/dev/null || echo default)"
-    read -r wd_status wd_fails wd_next < <(python3 - <<'EOF' 2>/dev/null
+    read -r wd_status wd_fails wd_next < <(timeout 2 python3 - <<'EOF' 2>/dev/null
 import json, os
 try:
     d = json.load(open(os.path.expanduser('~/AI/singbox/watchdog-state.json')))
@@ -200,8 +204,8 @@ EOF
     else
       rm -f "$TRANS_MARKER"
     fi
-    server_tag=$(python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/AI/singbox/selected-server.json"))).get("tag",""))' 2>/dev/null)
-    lat=$(python3 - <<'EOF' 2>/dev/null
+    server_tag=$(timeout 2 python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/AI/singbox/selected-server.json"))).get("tag",""))' 2>/dev/null)
+    lat=$(timeout 3 python3 - <<'EOF' 2>/dev/null
 import json, os, socket, time
 try:
     cfg = json.load(open(os.path.expanduser('~/AI/singbox/config-full.json')))

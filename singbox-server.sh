@@ -4,6 +4,7 @@ DIR="$HOME/AI"
 RAW="$DIR/neodon-sub/raw.json"
 CFG="$DIR/singbox/config.json"
 CFG_FULL="$DIR/singbox/config-full.json"
+CFG_PROXY="$DIR/singbox/config-proxy.json"
 SB="$DIR/singbox/sing-box"
 [ -x "$SB" ] || SB="$(command -v sing-box 2>/dev/null || echo /usr/local/bin/sing-box)"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -28,6 +29,10 @@ for o in cfg.get("outbounds") or []:
         "server": s.get("address"),
         "server_port": s.get("port"),
         "uuid": user.get("id"),
+        # Bootstrap resolver for the proxy server's own domain: route/DNS default
+        # is "remote" (DoT through the proxy) — without this per-outbound override
+        # the proxy cannot resolve itself (DNS query loopback in transport[remote]).
+        "domain_resolver": "local",
     }
     flow = user.get("flow") or ""
     if flow:
@@ -94,23 +99,28 @@ set_server() {
   out=$(build_outbound "$n") || { echo "ОШИБКА: сервер $n не найден"; return 1; }
   name=$(echo "$out" | python3 -c 'import json,sys; print(json.load(sys.stdin)["server"])')
   cp "$CFG" "$CFG.bak" && cp "$CFG_FULL" "$CFG_FULL.bak"
-  python3 - "$CFG" "$CFG_FULL" "$out" <<'PY'
-import json, sys
-cfg, cfg_full, out = sys.argv[1], sys.argv[2], json.loads(sys.argv[3])
-for p in (cfg, cfg_full):
+  [ -f "$CFG_PROXY" ] && cp "$CFG_PROXY" "$CFG_PROXY.bak"
+  python3 - "$CFG" "$CFG_FULL" "$CFG_PROXY" "$out" <<'PY'
+import json, os, sys
+cfg, cfg_full, cfg_proxy, out = sys.argv[1], sys.argv[2], sys.argv[3], json.loads(sys.argv[4])
+for p in (cfg, cfg_full, cfg_proxy):
+    if not os.path.exists(p):
+        continue
     d = json.load(open(p))
     d["outbounds"] = [out if o.get("tag") == "proxy" else o for o in d["outbounds"]]
     with open(p, "w") as f:
         json.dump(d, f, indent=2, ensure_ascii=False)
         f.write("\n")
 PY
-  if "$SB" check -c "$CFG" >/dev/null 2>&1 && "$SB" check -c "$CFG_FULL" >/dev/null 2>&1; then
+  if "$SB" check -c "$CFG" >/dev/null 2>&1 && "$SB" check -c "$CFG_FULL" >/dev/null 2>&1 && { [ ! -f "$CFG_PROXY" ] || "$SB" check -c "$CFG_PROXY" >/dev/null 2>&1; }; then
     st=$(systemctl --user is-active sing-box.service 2>/dev/null)
     stf=$(systemctl --user is-active sing-box-full.service 2>/dev/null)
     if [ "$st" = active ] || [ "$st" = activating ]; then
+      touch "$HOME/AI/singbox/.transitioning"
       systemctl --user restart sing-box.service
       for i in $(seq 1 50); do systemctl --user is-active sing-box.service | grep -q active && break; sleep 0.2; done
     elif [ "$stf" = active ] || [ "$stf" = activating ]; then
+      touch "$HOME/AI/singbox/.transitioning"
       systemctl --user restart sing-box-full.service
       # киллсвитч allowlist завязан на IP старого сервера — переустанавливаем
       # (install идемпотентен: добавляет IP нового сервера, ничего не флашит)
@@ -136,6 +146,7 @@ PYEOF3
   else
     cp "$CFG.bak" "$CFG"
     cp "$CFG_FULL.bak" "$CFG_FULL"
+    [ -f "$CFG_PROXY.bak" ] && cp "$CFG_PROXY.bak" "$CFG_PROXY"
     echo "ОШИБКА: конфигурация не прошла sing-box check — восстановлено"
     return 1
   fi

@@ -1,0 +1,16 @@
+{
+ "description": "VPN status hardening: bounded probes + intent switch",
+ "folderSlug": "vpn-status-hardening",
+ "keywords": [
+  "vpn",
+  "status",
+  "hardening"
+ ],
+ "lastUpdated": "2026-10-03T21:08:41Z",
+ "level": "2",
+ "memoryNameHistory": [],
+ "memorySequence": 0,
+ "parentChain": [],
+ "specFolder": "034-vpn-status-hardening",
+ "specId": "034"
+}
