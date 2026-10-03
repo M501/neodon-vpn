@@ -109,6 +109,12 @@ function Content() {
     // (off at 1s -> poll still CONNECTED -> checked true -> phantom vpn_up).
     const seenRef = SP_REACT.useRef(false);
     const wantRef = SP_REACT.useRef(null);
+    // Server dropdown echo guards (same class as the toggle guard above, but the
+    // live host showed real ping-pong here: 4/5/5/4/4/5/4/4 set_server calls per
+    // user action). Without them, a refresh with the not-yet-persisted
+    // selected-server.json flips the dropdown back and re-fires onChange.
+    const seenSrvRef = SP_REACT.useRef(-1);
+    const srvCmdRef = SP_REACT.useRef(null);
     async function refresh() {
         try {
             // One round trip, not three: panel syncs in ~1 poll, not ~3.
@@ -154,8 +160,15 @@ function Content() {
             setServers(list.map((s, i) => ({ data: i, label: s.remarks || ("Server " + (i + 1)) })));
             const ai = list.findIndex((s) => s.address && s.address === active);
             // Never snap back to first on a backend hiccup: keep current idx.
-            if (ai >= 0)
+            // Quiet window while our set_server is in flight: selected-server.json
+            // updates a couple of seconds late; showing that stale truth would flip
+            // the dropdown back and re-fire onChange (phantom set_server, switch
+            // "does not apply"). 8s covers the restart+wait inside server.sh.
+            const srvQuiet = srvCmdRef.current !== null && Date.now() - srvCmdRef.current.ts < 8000;
+            if (ai >= 0 && !srvQuiet) {
                 setSrvIdx(ai);
+                seenSrvRef.current = ai;
+            }
             const qq = un(qres)?.quota;
             setQuota(qq && qq.used ? String(qq.used) : "");
         }
@@ -194,6 +207,12 @@ function Content() {
     async function switchServer(i) {
         if (servers.length === 0)
             return;
+        // Echo guard: an echo re-fires with the value we already rendered; a real
+        // pick reports a different one. A same-value re-fire must not reach backend.
+        if (i === seenSrvRef.current)
+            return;
+        seenSrvRef.current = i;
+        srvCmdRef.current = { v: i, ts: Date.now() };
         setSrvIdx(i);
         await call("set_server", i);
         setTimeout(refresh, 1500);

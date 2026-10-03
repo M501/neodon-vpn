@@ -72,6 +72,7 @@ _memory:
 - `scripts/singbox-server.sh`: `domain_resolver: "local"` в proxy-аутбаунде (bootstrap) + патч `config-proxy.json` + маркер `.transitioning` перед рестартами.
 - `scripts/neodon-heal.sh`: restart-guard по свежему маркеру + guard substate auto-restart.
 - CHANGES.md, синк репо-копий (root toggle/server, watchdog репо←live, heal), питфолы в скилле.
+- Iter-2 (по приёмке владельца): эхо-гварды дропдауна серверов в панели; status-json больше не удаляет свежий `.transitioning` (срывал heal-guard при смене сервера).
 
 ### Out of Scope
 - Ремонт мёртвых серверов #4/#5/#9 (сторона провайдера) — только выбор рабочих.

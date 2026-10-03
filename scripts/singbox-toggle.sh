@@ -201,9 +201,11 @@ EOF
     fi
     if [ "$transitioning" = true ] && [ "$state" != "CONNECTED" ] && [ "$state" != "OFF" ]; then
       state=TRANSITIONING
-    else
-      rm -f "$TRANS_MARKER"
     fi
+    # NOTE: the old else-branch deleted a FRESH marker whenever the state looked
+    # CONNECTED/OFF mid-flight; that stripped the restart-in-flight signal from
+    # neodon-heal, which then wiped .mode/resolv during server switches.
+    # Stale markers are removed by the age check above — never delete a fresh one.
     server_tag=$(timeout 2 python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/AI/singbox/selected-server.json"))).get("tag",""))' 2>/dev/null)
     lat=$(timeout 3 python3 - <<'EOF' 2>/dev/null
 import json, os, socket, time
