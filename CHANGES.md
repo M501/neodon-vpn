@@ -9,6 +9,8 @@
 - Репо-синк: root `singbox-toggle.sh`/`singbox-server.sh` выровнены с scripts/; `scripts/neodon-watchdog.sh` — порт live (smart+direct-probe); `scripts/neodon-heal.sh` — новая версия.
 - Бэкапы на устройстве: `~/AI/singbox/singbox-toggle.sh.bak-20261004`, `~/AI/backups-neodon-20261004/`.
 
+- Ресёрч готовых Decky-VPN плагинов (04.10): `docs/research-decky-vpn-alternatives-20261004.md` — ни один готовый не закрывает «ссылка-подписка → Game Mode» целиком (лучшие: xray-decky — TUN+подписка, вне стора; hiddify-steam-deck-vpn — hot-apply, без лицензии); свой плагин обоснован.
+
 ## 2026-10-02 — smart: steamwebhelper через VPN
 - Баг: в smart-режиме трафик `steamwebhelper` (веб-часть Steam = магазин Decky, браузер QAM) был `direct` → домен магазина (`plugins.deckbrew.xyz`) из РФ недоступен напрямую → вечный спиннер = «магазин без VPN не работает».
 - Фикс: убран `steamwebhelper` из direct-правила (`qbittorrent/steam/reaper` остаются direct — экономия квоты на игровых загрузках). Правка в `scripts/gen_full_profiles.py` + `scripts/neodon-gen-config.py` (и на устройстве в живом конфиге). Проверено: магазин отдаёт список плагинов (HTTP 200).
