@@ -73,6 +73,7 @@ _memory:
 - `scripts/neodon-heal.sh`: restart-guard по свежему маркеру + guard substate auto-restart.
 - CHANGES.md, синк репо-копий (root toggle/server, watchdog репо←live, heal), питфолы в скилле.
 - Iter-2 (по приёмке владельца): эхо-гварды дропдауна серверов в панели; status-json больше не удаляет свежий `.transitioning` (срывал heal-guard при смене сервера).
+- Iter-3 (по приёмке владельца): env-фикс бэкенда (XDG/DBUS + фолбэк `~/.connected-since`) — таймер не сбрасывается; маркер с первой секунды set_server + TTL 30/35с; ошибки Refresh видны.
 
 ### Out of Scope
 - Ремонт мёртвых серверов #4/#5/#9 (сторона провайдера) — только выбор рабочих.

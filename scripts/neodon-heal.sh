@@ -26,7 +26,7 @@ fi
 # is coming back, not gone (otherwise .mode/resolv got wiped mid-server-switch).
 if [ -f "$SBOX/.transitioning" ]; then
   _age=$(( $(date +%s) - $(stat -c %Y "$SBOX/.transitioning" 2>/dev/null || echo 0) ))
-  if [ "$_age" -le 20 ]; then
+  if [ "$_age" -le 35 ]; then
     echo "heal: restart in flight (marker ${_age}s old) — skip"
     exit 0
   fi
