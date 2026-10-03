@@ -96,6 +96,8 @@ set_server() {
     echo "ОШИБКА: '$n' — не номер"
     return 1
   fi
+  # с первого мгновения статус = TRANSITIONING, без FAILED-вспышки в панели
+  touch "$HOME/AI/singbox/.transitioning"
   out=$(build_outbound "$n") || { echo "ОШИБКА: сервер $n не найден"; return 1; }
   name=$(echo "$out" | python3 -c 'import json,sys; print(json.load(sys.stdin)["server"])')
   cp "$CFG" "$CFG.bak" && cp "$CFG_FULL" "$CFG_FULL.bak"

@@ -182,8 +182,15 @@ function Content() {
       />
       <ButtonItem layout="below" onClick={async () => {
         setMeta("refreshing subscription…");
-        await call("refresh_sub");
-        refresh();
+        try {
+          const r: any = un(await call("refresh_sub"));
+          setMeta(r?.ok
+            ? "subscription updated"
+            : "refresh: " + String(r?.error || "failed").slice(0, 60));
+        } catch (e) {
+          setMeta("refresh failed");
+        }
+        setTimeout(refresh, 2500);
       }}>
         Refresh (servers + usage)
       </ButtonItem>

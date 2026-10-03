@@ -31,7 +31,7 @@ case "$1" in
     ;;
 esac
 case "$1" in
-  smart) bash ~/AI/singbox/dns-fix.sh apply || true; stop_all; fw_flush; set_mode smart; if systemctl --user start sing-box.service; then (curl -s -m 12 https://api.ipify.org >/dev/null 2>&1 &); wd_reset; echo "VPN SMART switching..."; notify "переключение на SMART…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
+  smart) bash ~/AI/singbox/dns-fix.sh apply || true; stop_all; fw_flush; set_mode smart; if systemctl --user start sing-box.service; then date +%s > "$HOME/AI/singbox/.connected-since"; (curl -s -m 12 https://api.ipify.org >/dev/null 2>&1 &); wd_reset; echo "VPN SMART switching..."; notify "переключение на SMART…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
   full)
     stop_all
     fw_flush
@@ -71,6 +71,7 @@ case "$1" in
       exit 1
     fi
     wd_reset
+    date +%s > "$HOME/AI/singbox/.connected-since"
     EXIT=$(curl -s -m 2 https://api.ipify.org 2>/dev/null)
     if [ -n "$EXIT" ] && [[ "$EXIT" != 79.139.* ]]; then
       echo "VPN FULL ON (READY) — exit $EXIT"
@@ -79,9 +80,10 @@ case "$1" in
       echo "FULL WARNING — exit не подтверждён, но firewall LOCKED (fail-closed). Run 'toggle off' to unlock."
     fi
     ;;
-  proxy) stop_all; fw_flush; set_mode proxy; bash ~/AI/singbox/dns-fix.sh apply || true; if systemctl --user start sing-box-proxy.service; then (curl -s -m 12 -x socks5h://127.0.0.1:10808 https://api.ipify.org >/dev/null 2>&1 &); wd_reset; echo "VPN PROXY switching..."; notify "переключение на PROXY…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
+  proxy) stop_all; fw_flush; set_mode proxy; bash ~/AI/singbox/dns-fix.sh apply || true; if systemctl --user start sing-box-proxy.service; then date +%s > "$HOME/AI/singbox/.connected-since"; (curl -s -m 12 -x socks5h://127.0.0.1:10808 https://api.ipify.org >/dev/null 2>&1 &); wd_reset; echo "VPN PROXY switching..."; notify "переключение на PROXY…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
   off)
     stop_all
+    rm -f "$HOME/AI/singbox/.connected-since"
     for _i in $(seq 1 25); do
       systemctl --user is-active sing-box.service sing-box-full.service sing-box-proxy.service 2>/dev/null | grep -qE '^active$' || break
       sleep 0.2
@@ -99,7 +101,7 @@ status-json)
     desired=$(cat "$MODE_FILE" 2>/dev/null || echo unknown)
     transitioning=false
     if [ -f "$TRANS_MARKER" ]; then
-      if [ "$(( $(date +%s) - $(stat -c %Y "$TRANS_MARKER" 2>/dev/null || echo 0) ))" -gt 15 ]; then
+      if [ "$(( $(date +%s) - $(stat -c %Y "$TRANS_MARKER" 2>/dev/null || echo 0) ))" -gt 30 ]; then
         rm -f "$TRANS_MARKER"
       else
         transitioning=true

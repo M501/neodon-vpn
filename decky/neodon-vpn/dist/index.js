@@ -224,8 +224,16 @@ function Content() {
                     { data: "full", label: "TUNNEL" },
                 ], selectedOption: mode, onChange: (v) => switchMode(v?.data || "smart"), strDefaultLabel: "Mode" }), SP_JSX.jsx(DFL.Dropdown, { rgOptions: servers, selectedOption: srvIdx, onChange: (v) => switchServer(Number(v?.data ?? 0)), strDefaultLabel: "Server" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: async () => {
                     setMeta("refreshing subscription…");
-                    await call("refresh_sub");
-                    refresh();
+                    try {
+                        const r = un(await call("refresh_sub"));
+                        setMeta(r?.ok
+                            ? "subscription updated"
+                            : "refresh: " + String(r?.error || "failed").slice(0, 60));
+                    }
+                    catch (e) {
+                        setMeta("refresh failed");
+                    }
+                    setTimeout(refresh, 2500);
                 }, children: "Refresh (servers + usage)" }), quota !== "" && SP_JSX.jsxs("div", { children: ["Usage: ", quota] }), rulesName !== "" && SP_JSX.jsxs("div", { children: ["Traffic rules: ", rulesName] }), SP_JSX.jsx("div", { children: "* rules come from the desktop app" })] }));
 }
 var index = definePlugin(() => {

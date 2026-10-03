@@ -59,6 +59,12 @@ def _clean_env():
     # Decky >=3.1 ships LD_LIBRARY_PATH that breaks subprocess (libcrypto).
     env = dict(os.environ)
     env["LD_LIBRARY_PATH"] = ""
+    # `systemctl --user` needs the session bus; the loader does not always
+    # pass XDG_RUNTIME_DIR down to plugin backends. Without it _service_since
+    # always failed, so the QAM clock restarted from zero on every open.
+    uid = os.getuid()
+    env.setdefault("XDG_RUNTIME_DIR", "/run/user/%d" % uid)
+    env.setdefault("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/user/%d/bus" % uid)
     return env
 
 
@@ -114,16 +120,21 @@ async def _service_since(svc):
     rc, out, _ = await _run(
         ["systemctl", "--user", "show", svc,
          "-p", "ActiveEnterTimestampMonotonic", "--value"], 5)
-    if rc != 0:
-        return 0
-    try:
-        enter_us = int(out.strip())
-        if enter_us <= 0:
-            return 0
+    enter_us = 0
+    if rc == 0:
+        try:
+            enter_us = int(out.strip())
+        except ValueError:
+            enter_us = 0
+    if enter_us > 0:
         now_wall = datetime.datetime.now().timestamp()
         now_mono_us = time.monotonic_ns() // 1000
         return int(now_wall - (now_mono_us - enter_us) / 1_000_000)
-    except ValueError:
+    # Fallback: host-side stamp written by singbox-toggle on every start.
+    try:
+        with open(os.path.join(HOME, "AI", "singbox", ".connected-since")) as f:
+            return int(f.read().strip())
+    except (OSError, ValueError):
         return 0
 
 
@@ -320,5 +331,5 @@ class Plugin:
 
     async def refresh_sub(self):
         r = await refresh_sub()
-        _log("refresh_sub -> ok=%s" % r.get("ok"))
+        _log("refresh_sub -> ok=%s err=%s" % (r.get("ok"), str(r.get("error") or "")[:140]))
         return r
