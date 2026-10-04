@@ -1,0 +1,17 @@
+{
+ "created_at": "2026-10-04T00:52:38Z",
+ "derived": {
+  "last_active_child_id": null
+ },
+ "files": [
+  "checklist.md",
+  "implementation-summary.md",
+  "plan.md",
+  "spec.md",
+  "tasks.md"
+ ],
+ "level": "2",
+ "schema_version": 2,
+ "specFolder": "035-panel-switch-ux",
+ "status": "draft"
+}

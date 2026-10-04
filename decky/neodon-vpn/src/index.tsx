@@ -24,6 +24,37 @@ function fmtUptime(sec: number): string {
   return p(h) + ":" + p(m) + ":" + p(s);
 }
 
+// Raw backend states -> human words. The panel must never print FAILED /
+// urlopen shapes (owner report 04.10): honest, but calm.
+const FRIENDLY: Record<string, string> = {
+  CONNECTED: "connected",
+  DEGRADED: "server not responding",
+  FAILED: "connection failed",
+  STARTING: "starting",
+  TRANSITIONING: "switching",
+  CONNECTING: "connecting",
+  STOPPING: "stopping",
+  LOCKED: "killswitch locked",
+  OFF: "off",
+};
+
+// Short server name for status lines: "🇵🇱 [PL] NEODON…" -> "PL".
+function shortLabel(label: string): string {
+  const m = /\[([A-Za-z0-9]{1,4})\]/.exec(label || "");
+  return m ? m[1] : String(label || "").slice(0, 14);
+}
+
+// Classify backend errors into short human text (never dump urlopen guts).
+function shortErr(e: any): string {
+  const s = String(e || "").replace(/\s+/g, " ");
+  if (/name resolution|Errno -3|getaddrinfo|nodename/i.test(s)) return "no network (DNS)";
+  if (/timed? ?out/i.test(s)) return "timeout";
+  if (/urlopen|unreachable|http/i.test(s)) return "network error";
+  return s.slice(0, 48) || "failed";
+}
+
+type Pending = { kind: "srv" | "on" | "off"; label: string; target: number; ts: number };
+
 function Content() {
   const [on, setOn] = useState<boolean>(false);
   const [mode, setMode] = useState<Mode>("smart");
@@ -34,6 +65,8 @@ function Content() {
   const [srvIdx, setSrvIdx] = useState<number>(0);
   const [quota, setQuota] = useState<string>("");
   const [rulesName, setRulesName] = useState<string>("");
+  const [notice, setNotice] = useState<string>("");
+  const noticeTsRef = useRef<number>(0);
   // Remount starts false: first paint must say Syncing, never stale OFF.
   const [synced, setSynced] = useState<boolean>(false);
   // Last rendered switch position (echo guard) + last commanded intent.
@@ -41,12 +74,27 @@ function Content() {
   // (off at 1s -> poll still CONNECTED -> checked true -> phantom vpn_up).
   const seenRef = useRef<boolean>(false);
   const wantRef = useRef<{ v: boolean; ts: number } | null>(null);
-  // Server dropdown echo guards (same class as the toggle guard above, but the
-  // live host showed real ping-pong here: 4/5/5/4/4/5/4/4 set_server calls per
-  // user action). Without them, a refresh with the not-yet-persisted
-  // selected-server.json flips the dropdown back and re-fires onChange.
+  // Server dropdown guards (live host showed real ping-pong here: 4/5/5/4/4/5
+  // set_server calls per action). seenSrv = last rendered value; progSrvTs =
+  // when WE last moved the dropdown (so a same-value re-fire can be told
+  // apart from a deliberate re-tap).
   const seenSrvRef = useRef<number>(-1);
-  const srvCmdRef = useRef<{ v: number; ts: number } | null>(null);
+  const progSrvTsRef = useRef<number>(0);
+  // Pending command: shown immediately as "switching to X…"/"connecting…"
+  // until backend truth confirms it (or 15 s). Kills the dead 5-s-poll feel.
+  const pendRef = useRef<Pending | null>(null);
+  // Last observed actual_state (re-tap decisions).
+  const stRef = useRef<string>("");
+
+  function showNotice(s: string) {
+    setNotice(s);
+    noticeTsRef.current = Date.now();
+  }
+
+  function clearPending() {
+    pendRef.current = null;
+    setTick((t: number) => t + 1);
+  }
 
   async function refresh() {
     try {
@@ -60,23 +108,21 @@ function Content() {
       const ok: boolean = !!st?.ok;
       const actual: string = st?.actual_state || "?";
       const dm: string = st?.desired_mode || "smart";
+      stRef.current = actual;
       // Switch follows INTENT (desired_mode), never a transient actual state:
-      // mid-transition states (TRANSITIONING/FAILED/DEGRADED) must not flip the
-      // switch — a prop flip re-fires Steam's onChange and that phantom call
-      // restarts or kills the service (reconnect churn + clock reset). A failed
-      // poll keeps the last rendered position instead of guessing OFF.
+      // mid-transition states must not flip the switch — a prop flip re-fires
+      // Steam's onChange and that phantom call restarts or kills the service.
       const nowOn: boolean = ok ? dm !== "off" : seenRef.current;
-      // Quiet window: while our own command is in flight, keep showing the
-      // commanded position instead of flapping with half-done backend truth.
+      // Quiet window: while our own power command is in flight, keep showing
+      // the commanded position instead of flapping with half-done truth.
       const quiet: boolean =
         wantRef.current !== null && Date.now() - wantRef.current.ts < 8000;
       if (!quiet) {
         setOn(nowOn);
         seenRef.current = nowOn;
       }
-      // Honest clock: backend systemd timestamp wins (survives panel
-      // reopen); local arming is the fallback. Cleared on drop and never
-      // armed while the backend is FAILED/LOCKED.
+      // Honest clock: backend systemd timestamp wins (survives panel reopen);
+      // local arming is the fallback. Cleared on drop; never armed mid-fail.
       if (nowOn && actual !== "FAILED" && actual !== "LOCKED") {
         const cs: number = Number(st?.connected_since || 0);
         sinceRef.current = cs > 0 ? cs * 1000 : (sinceRef.current || Date.now());
@@ -84,8 +130,9 @@ function Content() {
         sinceRef.current = 0;
       }
       setMode(dm === "full" ? "full" : "smart");
-      const ip: string = st?.exit_ip || "—";
-      setMeta(actual + " · " + ip);
+      const ip: string = st?.exit_ip || "";
+      const fr: string = FRIENDLY[actual] || String(actual).toLowerCase();
+      setMeta(fr + (ip ? " · " + ip : ""));
       setRulesName(st?.profile_name || st?.profile || "");
       const sv: any = un(svres);
       const list: any[] = sv?.servers || [];
@@ -94,21 +141,34 @@ function Content() {
         list.map((s: any, i: number) => ({ data: i, label: s.remarks || ("Server " + (i + 1)) }))
       );
       const ai: number = list.findIndex((s: any) => s.address && s.address === active);
-      // Never snap back to first on a backend hiccup: keep current idx.
-      // Quiet window while our set_server is in flight: selected-server.json
-      // updates a couple of seconds late; showing that stale truth would flip
-      // the dropdown back and re-fire onChange (phantom set_server, switch
-      // "does not apply"). 8s covers the restart+wait inside server.sh.
-      const srvQuiet =
-        srvCmdRef.current !== null && Date.now() - srvCmdRef.current.ts < 8000;
-      if (ai >= 0 && !srvQuiet) {
+      const p = pendRef.current;
+      if (p) {
+        // Settle conditions: server pick -> selection persisted AND a settled
+        // state (never claim "connected" within the first 3 s — that is the
+        // old link still answering; the restart + transition marker follow).
+        const settled =
+          p.kind === "srv"
+            ? ai === p.target && (
+                actual === "DEGRADED" || actual === "FAILED" || actual === "LOCKED" ||
+                actual === "OFF" || (actual === "CONNECTED" && Date.now() - p.ts > 3000)
+              )
+            : p.kind === "on"
+              ? actual === "CONNECTED" || actual === "DEGRADED" || actual === "FAILED" || actual === "LOCKED"
+              : actual === "OFF";
+        if (settled || Date.now() - p.ts > 15000) clearPending();
+      }
+      // While our set_server is in flight, keep the user's pick rendered:
+      // a stale selected-server.json must not flip the dropdown back.
+      const srvBusy = pendRef.current?.kind === "srv";
+      if (ai >= 0 && !srvBusy) {
+        if (ai !== seenSrvRef.current) progSrvTsRef.current = Date.now();
         setSrvIdx(ai);
         seenSrvRef.current = ai;
       }
       const qq: any = un(qres)?.quota;
       setQuota(qq && qq.used ? String(qq.used) : "");
     } catch (e) {
-      setMeta("poll error");
+      setMeta("backend offline");
     }
     // First paint must never claim OFF: remount starts false, truth arrives late.
     setSynced(true);
@@ -127,7 +187,13 @@ function Content() {
 
   async function power(next: boolean) {
     wantRef.current = { v: next, ts: Date.now() };
-    await call(next ? "vpn_up" : "vpn_down");
+    pendRef.current = { kind: next ? "on" : "off", label: "", target: 0, ts: Date.now() };
+    const r: any = un(await call(next ? "vpn_up" : "vpn_down"));
+    if (!r?.ok) {
+      clearPending();
+      showNotice((next ? "power on" : "power off") + " failed: " + shortErr(r?.out || r?.error));
+    }
+    setTick((t: number) => t + 1);
     setTimeout(refresh, 1200);
   }
 
@@ -145,19 +211,54 @@ function Content() {
 
   async function switchServer(i: number) {
     if (servers.length === 0) return;
-    // Echo guard: an echo re-fires with the value we already rendered; a real
-    // pick reports a different one. A same-value re-fire must not reach backend.
-    if (i === seenSrvRef.current) return;
+    if (i === seenSrvRef.current) {
+      // Same value re-fire: either a Steam echo right after our own prop
+      // change, or a deliberate re-tap of the same server.
+      const isEcho = Date.now() - progSrvTsRef.current < 800;
+      if (isEcho) return;
+      if (pendRef.current) return;               // a switch is already in flight
+      if (stRef.current === "CONNECTED") return; // already connected — no-op
+      // Deliberate re-tap on a non-connected link: retry (fresh set_server).
+    }
     seenSrvRef.current = i;
-    srvCmdRef.current = { v: i, ts: Date.now() };
+    progSrvTsRef.current = Date.now();
+    const label: string = shortLabel(String((servers[i] as any)?.label ?? ""));
+    // Instant feedback only when there is a link to switch; with the VPN off
+    // picking a server is a silent config change (the dropdown already moved).
+    if (stRef.current !== "OFF") {
+      pendRef.current = { kind: "srv", label: label, target: i, ts: Date.now() };
+    }
     setSrvIdx(i);
-    await call("set_server", i);
+    const r: any = un(await call("set_server", i));
+    if (!r?.ok) {
+      clearPending();
+      showNotice("switch failed: " + shortErr(r?.error || r?.out));
+    }
+    setTick((t: number) => t + 1);
     setTimeout(refresh, 1500);
+  }
+
+  const pend = pendRef.current;
+  const noticeLive = notice !== "" && Date.now() - noticeTsRef.current < 12000;
+  const bad = stRef.current === "DEGRADED" || stRef.current === "FAILED";
+  let statusLine: string;
+  if (!synced) {
+    statusLine = "Syncing…";
+  } else if (pend) {
+    if (pend.kind === "srv") {
+      statusLine = (on ? "● On" : "○ Off") + " (switching to " + pend.label + "…)";
+    } else if (pend.kind === "on") {
+      statusLine = "● On (connecting…)";
+    } else {
+      statusLine = "○ Off (turning off…)";
+    }
+  } else {
+    statusLine = (on ? "● On" : "○ Off") + " (" + meta + ")";
   }
 
   return (
     <PanelSection title="Neodon VPN">
-      <div>{!synced ? "Syncing…" : "Status: " + (on ? "● On" : "○ Off") + " (" + meta + ")"}</div>
+      <div>{"Status: " + statusLine}</div>
       <ToggleField
         label={on && sinceRef.current
           ? "VPN · " + fmtUptime(Math.floor((Date.now() - sinceRef.current) / 1000))
@@ -180,20 +281,22 @@ function Content() {
         onChange={(v: any) => switchServer(Number(v?.data ?? 0))}
         strDefaultLabel="Server"
       />
+      {!pend && bad && (
+        <div>↳ no link — pick another server, or tap this one again to retry</div>
+      )}
       <ButtonItem layout="below" onClick={async () => {
-        setMeta("refreshing subscription…");
+        showNotice("refreshing subscription…");
         try {
           const r: any = un(await call("refresh_sub"));
-          setMeta(r?.ok
-            ? "subscription updated"
-            : "refresh: " + String(r?.error || "failed").slice(0, 60));
+          showNotice(r?.ok ? "subscription updated" : "refresh: " + shortErr(r?.error));
         } catch (e) {
-          setMeta("refresh failed");
+          showNotice("refresh failed");
         }
         setTimeout(refresh, 2500);
       }}>
         Refresh (servers + usage)
       </ButtonItem>
+      {noticeLive && <div>{notice}</div>}
       {quota !== "" && <div>Usage: {quota}</div>}
       {rulesName !== "" && <div>Traffic rules: {rulesName}</div>}
       <div>* rules come from the desktop app</div>
