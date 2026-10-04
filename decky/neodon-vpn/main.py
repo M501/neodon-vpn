@@ -11,6 +11,8 @@ import http.cookiejar
 import json
 import os
 import re
+import subprocess
+import tempfile
 import time
 import urllib.request
 
@@ -237,7 +239,7 @@ def parse_userinfo(line):
             "expire": exp, "ts": int(datetime.datetime.now().timestamp())}
 
 
-def _fetch_sub(url):
+def _fetch_sub_urllib(url):
     jar = http.cookiejar.CookieJar()
     op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
     ua = {"User-Agent": "v2rayN/7.24.6"}
@@ -250,6 +252,59 @@ def _fetch_sub(url):
     userinfo, _ = get(url)          # pass 1: cookies + userinfo header
     _, body = get(url)              # pass 2: server list body
     return userinfo, body
+
+
+def _fetch_sub_curl(url):
+    """curl fallback: its CA handling accepts the chains urllib intermittently
+    rejects from the provider's DDoS-Guard edge (owner report 04.10)."""
+    with tempfile.TemporaryDirectory() as td:
+        jar = os.path.join(td, "jar")
+
+        def get(u, want_body):
+            hpath = os.path.join(td, "h.txt")
+            bpath = os.path.join(td, "b.txt")
+            p = subprocess.run(
+                ["curl", "-sS", "--compressed", "-A", "v2rayN/7.24.6",
+                 "-c", jar, "-b", jar, "-D", hpath, "-m", "25", "-o", bpath, u],
+                capture_output=True, text=True, timeout=40)
+            if p.returncode != 0:
+                raise RuntimeError("curl rc=%d: %s" % (p.returncode, (p.stderr or "").strip()[:100]))
+            ui = ""
+            try:
+                for line in open(hpath, encoding="utf-8", errors="replace"):
+                    if line.lower().startswith("subscription-userinfo:"):
+                        ui = line.split(":", 1)[1].strip()
+            except OSError:
+                pass
+            body = ""
+            if want_body:
+                try:
+                    body = open(bpath, encoding="utf-8", errors="replace").read()
+                except OSError:
+                    body = ""
+            return ui, body
+
+        userinfo, _ = get(url, want_body=False)
+        _, body = get(url, want_body=True)
+        return userinfo, body
+
+
+def _fetch_sub(url):
+    """urllib first; on certificate flakes (intermittent from the subscription
+    edge) retry once, then fall back to curl."""
+    last = None
+    for _ in range(2):
+        try:
+            return _fetch_sub_urllib(url)
+        except Exception as e:
+            last = e
+            if "CERTIFICATE" not in str(e).upper():
+                raise
+            time.sleep(1.0)
+    try:
+        return _fetch_sub_curl(url)
+    except Exception:
+        raise last
 
 
 async def refresh_sub():
