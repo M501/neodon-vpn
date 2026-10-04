@@ -47,7 +47,9 @@ function shortLabel(label: string): string {
 // Classify backend errors into short human text (never dump urlopen guts).
 function shortErr(e: any): string {
   const s = String(e || "").replace(/\s+/g, " ");
-  if (/name resolution|Errno -3|getaddrinfo|nodename/i.test(s)) return "no network (DNS)";
+  if (/429|too many|rate.?limit/i.test(s)) return "provider rate-limited";
+  if (/certificate|CERTIFICATE|ssl|verify failed/i.test(s)) return "TLS verify failed";
+  if (/name resolution|Errno -[235]|getaddrinfo|nodename|Name or service/i.test(s)) return "no network (DNS)";
   if (/timed? ?out/i.test(s)) return "timeout";
   if (/urlopen|unreachable|http/i.test(s)) return "network error";
   return s.slice(0, 48) || "failed";

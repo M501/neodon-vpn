@@ -1,3 +1,11 @@
+## 2026-10-04 (61) — целевая архитектура v2 (раунд-таблица с ChatGPT web)
+
+- Диагноз «костылей»: смешение ownership (UI/shell/systemd/watchdog одновременно диспетчеры), dual-state файлы (.mode/.desired/.transitioning), DNS-резолв через мёртвый прокси (главный инцидент), рестарт ядра на смену сервера.
+- Совместно с ChatGPT web (3 раунда back-and-forth) собран документ `docs/architecture-target-20261004.md`: sing-box = dataplane (12 nodes + urltest `auto` + selector `active` через Clash API) + тонкий policy-manager (singbox-manager: intent/failover/recovery/status API) + UI-клиенты единого state; DNS: dns-direct default + dns-proxy (detour=active) для proxy-доменов; state machine (OFF/STARTING/SMART_ACTIVE/SMART_DEGRADED_DIRECT/FULL_ACTIVE/FULL_RECOVERING/NETWORK_DOWN); UX-спека QAM; миграция Phase 1..5 с приёмкой; риски и открытые вопросы.
+- Факт-чек по докам/исходникам v1.14: `PUT /configs` = no-op (reload нет — refresh рестартит ядро); selector управляется только через Clash API; urltest (url/interval/tolerance/idle_timeout, проба HEAD ~15s таймаут, фейл удаляет history); `cache_file.enabled` держит selection селектора.
+- Панель: классификатор ошибок Refresh расширен — 429 → «provider rate-limited», TLS → «TLS verify failed» (вместо общего «network error»).
+- Phase 1 (selector+Clash API+QAM read-back+DNS-fix) — следующий шаг внедрения, по отмашке владельца.
+
 ## 2026-10-04 (60) — панель: отклик смены сервера и человеческие статусы (спека 035)
 
 - Симптом (владелец, 04.10 ~03:30, Game Mode): «сервер переключается через 5–10 с, иногда только если повторно нажмёшь на другой; странные ошибки в скобках; магазин не грузит при включённом VPN».
