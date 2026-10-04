@@ -17,9 +17,8 @@ endpoint_host() {
 import json, sys
 cfg = json.load(open(sys.argv[1]))
 for o in cfg.get('outbounds', []):
-    if o.get('tag') == 'proxy' and o.get('server'):
+    if o.get('type') == 'vless' and o.get('server'):
         print(o['server'])
-        break
 PY
 }
 
