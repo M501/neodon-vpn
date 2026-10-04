@@ -1,79 +1,14 @@
 #!/usr/bin/env bash
-# sing-box VPN server picker (Bazzite)
+# sing-box VPN server picker — INSTANT selector switch via Clash API (spec 036).
+# No config patching / no service restart: the live configs carry all nodes,
+# urltest "auto" and selector "proxy" (Clash API on 127.0.0.1:9090).
+# Contract kept: `list` | `set <N>` (prints "OK: ..." on success).
 DIR="$HOME/AI"
 RAW="$DIR/neodon-sub/raw.json"
-CFG="$DIR/singbox/config.json"
-CFG_FULL="$DIR/singbox/config-full.json"
-CFG_PROXY="$DIR/singbox/config-proxy.json"
-SB="$DIR/singbox/sing-box"
-[ -x "$SB" ] || SB="$(command -v sing-box 2>/dev/null || echo /usr/local/bin/sing-box)"
+SEL="$DIR/singbox/selected-server.json"
+PREF="$DIR/singbox/.preferred-server"
+API="http://127.0.0.1:9090"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-
-build_outbound() {
-  python3 - "$RAW" "$1" <<'PY'
-import json, sys
-data = json.load(open(sys.argv[1]))
-try:
-    cfg = data[int(sys.argv[2])]
-except (IndexError, ValueError):
-    sys.exit(1)
-for o in cfg.get("outbounds") or []:
-    if o.get("protocol") != "vless":
-        continue
-    s = ((o.get("settings") or {}).get("vnext") or [{}])[0]
-    user = (s.get("users") or [{}])[0]
-    st = o.get("streamSettings") or {}
-    out = {
-        "type": "vless",
-        "tag": "proxy",
-        "server": s.get("address"),
-        "server_port": s.get("port"),
-        "uuid": user.get("id"),
-        # Bootstrap resolver for the proxy server's own domain: route/DNS default
-        # is "remote" (DoT through the proxy) — without this per-outbound override
-        # the proxy cannot resolve itself (DNS query loopback in transport[remote]).
-        "domain_resolver": "local",
-    }
-    flow = user.get("flow") or ""
-    if flow:
-        out["flow"] = flow
-    net = st.get("network")
-    if net == "ws":
-        ws = st.get("wsSettings") or {}
-        t = {"type": "ws", "path": ws.get("path") or "/"}
-        host = ws.get("host") or (ws.get("headers") or {}).get("Host")
-        if host:
-            t["headers"] = {"Host": host}
-        out["transport"] = t
-    elif net == "grpc":
-        gr = st.get("grpcSettings") or {}
-        out["transport"] = {"type": "grpc", "service_name": gr.get("serviceName") or "xyz"}
-    if st.get("security") == "tls":
-        ts = st.get("tlsSettings") or {}
-        out["tls"] = {
-            "enabled": True,
-            "server_name": ts.get("serverName") or s.get("address"),
-            "utls": {"enabled": True, "fingerprint": ts.get("fingerprint") or "chrome"},
-        }
-        if ts.get("alpn"):
-            out["tls"]["alpn"] = ts.get("alpn")
-    if st.get("security") == "reality":
-        r = st.get("realitySettings") or {}
-        out["tls"] = {
-            "enabled": True,
-            "server_name": r.get("serverName"),
-            "utls": {"enabled": True, "fingerprint": r.get("fingerprint") or "chrome"},
-            "reality": {
-                "enabled": True,
-                "public_key": r.get("publicKey"),
-                "short_id": r.get("shortId") or "",
-            },
-        }
-    print(json.dumps(out))
-    sys.exit(0)
-sys.exit(1)
-PY
-}
 
 list_servers() {
   python3 - "$RAW" <<'PY'
@@ -90,70 +25,86 @@ for i, cfg in enumerate(data):
 PY
 }
 
+_srv_meta() {  # $1=idx -> "<address> <remarks-one-word>"
+  python3 - "$RAW" "$1" <<'PY'
+import json, sys
+try:
+    cfg = json.load(open(sys.argv[1]))[int(sys.argv[2])]
+except Exception:
+    sys.exit(1)
+for o in cfg.get("outbounds") or []:
+    if o.get("protocol") != "vless":
+        continue
+    s = ((o.get("settings") or {}).get("vnext") or [{}])[0]
+    print(s.get("address"), (cfg.get("remarks") or "").replace(" ", "_"))
+    sys.exit(0)
+sys.exit(1)
+PY
+}
+
+_write_selected() {  # $1=idx $2=address $3=tag
+  python3 - "$RAW" "$SEL" "$1" "$2" "$3" <<'PY'
+import json, sys, time
+raw, sel, idx, addr, tag = sys.argv[1:6]
+port = 443
+try:
+    cfg = json.load(open(raw))[int(idx)]
+    for o in cfg.get("outbounds") or []:
+        if o.get("protocol") == "vless":
+            port = (((o.get("settings") or {}).get("vnext") or [{}])[0]).get("port") or 443
+            break
+except Exception:
+    pass
+open(sel, "w").write(json.dumps({
+    "tag": tag.replace("_", " "), "server": addr, "server_port": port,
+    "updated": time.strftime("%Y-%m-%dT%H:%M:%S")}, ensure_ascii=False, indent=2))
+PY
+}
+
+_put_selector() {  # $1=idx -> rc0 when the selector switched to n<idx>
+  local i
+  for i in 1 2 3 4 5; do
+    curl -s -m 3 -X PUT -H 'Content-Type: application/json' \
+      -d "{\"name\":\"n$1\"}" "$API/proxies/proxy" >/dev/null 2>&1 && return 0
+    sleep 0.3
+  done
+  return 1
+}
+
 set_server() {
-  local n="$1" out name
+  local n="$1" meta addr tag u
   if ! [[ "$n" =~ ^[0-9]+$ ]]; then
     echo "ОШИБКА: '$n' — не номер"
     return 1
   fi
-  # с первого мгновения статус = TRANSITIONING, без FAILED-вспышки в панели
-  touch "$HOME/AI/singbox/.transitioning"
-  out=$(build_outbound "$n") || { echo "ОШИБКА: сервер $n не найден"; return 1; }
-  name=$(echo "$out" | python3 -c 'import json,sys; print(json.load(sys.stdin)["server"])')
-  cp "$CFG" "$CFG.bak" && cp "$CFG_FULL" "$CFG_FULL.bak"
-  [ -f "$CFG_PROXY" ] && cp "$CFG_PROXY" "$CFG_PROXY.bak"
-  python3 - "$CFG" "$CFG_FULL" "$CFG_PROXY" "$out" <<'PY'
-import json, os, sys
-cfg, cfg_full, cfg_proxy, out = sys.argv[1], sys.argv[2], sys.argv[3], json.loads(sys.argv[4])
-for p in (cfg, cfg_full, cfg_proxy):
-    if not os.path.exists(p):
-        continue
-    d = json.load(open(p))
-    d["outbounds"] = [out if o.get("tag") == "proxy" else o for o in d["outbounds"]]
-    with open(p, "w") as f:
-        json.dump(d, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-PY
-  if "$SB" check -c "$CFG" >/dev/null 2>&1 && "$SB" check -c "$CFG_FULL" >/dev/null 2>&1 && { [ ! -f "$CFG_PROXY" ] || "$SB" check -c "$CFG_PROXY" >/dev/null 2>&1; }; then
-    # Persist the choice BEFORE the restart: the QAM panel and status read
-    # selected-server.json; writing it late made the UI show the old server
-    # for seconds after a switch (owner report 04.10).
-    TAG=$(python3 - "$RAW" "$n" 2>/dev/null <<'PYEOF2'
-import json,sys
-try: print(json.load(open(sys.argv[1]))[int(sys.argv[2])].get("remarks",""))
-except: print("")
-PYEOF2
-)
-    if [ -z "$TAG" ]; then TAG=$(echo "$out" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("server",""))'); fi
-    python3 - "$out" "$TAG" <<'PYEOF3' 2>/dev/null || true
-import json, time, sys, os
-out=json.loads(sys.argv[1]); tag=sys.argv[2]
-sel={"tag": tag or out.get("server",""), "server": out["server"], "server_port": out["server_port"], "updated": time.strftime("%Y-%m-%dT%H:%M:%S")}
-open(os.path.expanduser("~/AI/singbox/selected-server.json"),"w").write(json.dumps(sel, ensure_ascii=False, indent=2))
-PYEOF3
-    st=$(systemctl --user is-active sing-box.service 2>/dev/null)
-    stf=$(systemctl --user is-active sing-box-full.service 2>/dev/null)
-    if [ "$st" = active ] || [ "$st" = activating ]; then
-      touch "$HOME/AI/singbox/.transitioning"
-      systemctl --user restart sing-box.service
-      for i in $(seq 1 50); do systemctl --user is-active sing-box.service | grep -q active && break; sleep 0.2; done
-    elif [ "$stf" = active ] || [ "$stf" = activating ]; then
-      touch "$HOME/AI/singbox/.transitioning"
-      systemctl --user restart sing-box-full.service
-      # киллсвитч allowlist завязан на IP старого сервера — переустанавливаем
-      # (install идемпотентен: добавляет IP нового сервера, ничего не флашит)
-      for i in $(seq 1 50); do systemctl --user is-active sing-box-full.service | grep -q active && break; sleep 0.2; done
-      bash ~/AI/singbox/killswitch.sh install >/dev/null 2>&1 && echo "KILLSWITCH: allowlist обновлён под " || echo "WARN: killswitch reinstall failed"
-    fi
-    :  # notify-popup отключён (owner 2026-09-26)
-    echo "OK: переключено на сервер $name"
-  else
-    cp "$CFG.bak" "$CFG"
-    cp "$CFG_FULL.bak" "$CFG_FULL"
-    [ -f "$CFG_PROXY.bak" ] && cp "$CFG_PROXY.bak" "$CFG_PROXY"
-    echo "ОШИБКА: конфигурация не прошла sing-box check — восстановлено"
-    return 1
+  meta=$(_srv_meta "$n") || { echo "ОШИБКА: сервер $n не найден"; return 1; }
+  addr=${meta%% *}; tag=${meta#* }
+
+  # persist intent first (panel/status read selected-server.json; startup applies it)
+  _write_selected "$n" "$addr" "$tag"
+  echo "$n" > "$PREF"
+
+  if _put_selector "$n"; then
+    echo "OK: переключено на сервер $addr"
+    return 0
   fi
+
+  # API down while a service is active: restart the ACTIVE unit only (rare fallback)
+  for u in sing-box.service sing-box-full.service sing-box-proxy.service; do
+    if systemctl --user is-active "$u" >/dev/null 2>&1; then
+      touch "$HOME/AI/singbox/.transitioning"
+      systemctl --user restart "$u"
+      if _put_selector "$n"; then
+        echo "OK: переключено на сервер $addr (после рестарта)"
+        return 0
+      fi
+      echo "ОШИБКА: не удалось применить переключение"
+      return 1
+    fi
+  done
+
+  echo "OK: выбор сохранён (применится при включении)"
+  return 0
 }
 
 case "${1:-}" in

@@ -278,6 +278,7 @@ function Content() {
         strDefaultLabel="Mode"
       />
       <Dropdown
+        key={"srv-" + srvIdx}
         rgOptions={servers}
         selectedOption={srvIdx}
         onChange={(v: any) => switchServer(Number(v?.data ?? 0))}

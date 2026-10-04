@@ -16,6 +16,17 @@ TRANS_MARKER=~/AI/singbox/.transitioning
 notify() { :; }  # owner 2026-09-08: desktop popup spam off
 set_mode() { echo "$1" > "$MODE_FILE"; echo "$1" > "$HOME/AI/singbox/.desired"; }
 wd_reset() { python3 -c 'import json,time,os;f=os.path.expanduser("~/AI/singbox/watchdog-state.json");d=json.load(open(f));d.update({"consecutive_failures":0,"backoff_index":0,"next_due_ts":int(time.time()),"watchdog_status":"ok"});json.dump(d,open(f,"w"))'; }
+apply_pref() {
+  # spec 036: apply the remembered server choice to the selector (tag "proxy") via Clash API
+  local pf="$HOME/AI/singbox/.preferred-server" n i
+  [ -f "$pf" ] || return 0
+  n=$(cat "$pf" 2>/dev/null)
+  [ -n "$n" ] || return 0
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    curl -s -m 2 -X PUT -H 'Content-Type: application/json' -d "{\"name\":\"n$n\"}" http://127.0.0.1:9090/proxies/proxy >/dev/null 2>&1 && return 0
+    sleep 0.4
+  done
+}
 fw_flush() { bash ~/AI/singbox/killswitch.sh remove >/dev/null 2>&1 || true; }
 stop_all() {
   systemctl --user stop sing-box.service 2>/dev/null
@@ -31,7 +42,7 @@ case "$1" in
     ;;
 esac
 case "$1" in
-  smart) bash ~/AI/singbox/dns-fix.sh apply || true; stop_all; fw_flush; set_mode smart; if systemctl --user start sing-box.service; then date +%s > "$HOME/AI/singbox/.connected-since"; (curl -s -m 12 https://api.ipify.org >/dev/null 2>&1 &); wd_reset; echo "VPN SMART switching..."; notify "переключение на SMART…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
+  smart) bash ~/AI/singbox/dns-fix.sh apply || true; stop_all; fw_flush; set_mode smart; if systemctl --user start sing-box.service; then date +%s > "$HOME/AI/singbox/.connected-since"; (curl -s -m 12 https://api.ipify.org >/dev/null 2>&1 &); apply_pref; wd_reset; echo "VPN SMART switching..."; notify "переключение на SMART…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
   full)
     stop_all
     fw_flush
@@ -70,6 +81,7 @@ case "$1" in
       notify "FULL FAILED — killswitch install error"
       exit 1
     fi
+    apply_pref
     wd_reset
     date +%s > "$HOME/AI/singbox/.connected-since"
     EXIT=$(curl -s -m 2 https://api.ipify.org 2>/dev/null)
@@ -80,7 +92,7 @@ case "$1" in
       echo "FULL WARNING — exit не подтверждён, но firewall LOCKED (fail-closed). Run 'toggle off' to unlock."
     fi
     ;;
-  proxy) stop_all; fw_flush; set_mode proxy; bash ~/AI/singbox/dns-fix.sh apply || true; if systemctl --user start sing-box-proxy.service; then date +%s > "$HOME/AI/singbox/.connected-since"; (curl -s -m 12 -x socks5h://127.0.0.1:10808 https://api.ipify.org >/dev/null 2>&1 &); wd_reset; echo "VPN PROXY switching..."; notify "переключение на PROXY…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
+  proxy) stop_all; fw_flush; set_mode proxy; bash ~/AI/singbox/dns-fix.sh apply || true; if systemctl --user start sing-box-proxy.service; then date +%s > "$HOME/AI/singbox/.connected-since"; (curl -s -m 12 -x socks5h://127.0.0.1:10808 https://api.ipify.org >/dev/null 2>&1 &); apply_pref; wd_reset; echo "VPN PROXY switching..."; notify "переключение на PROXY…"; else echo "VPN: ошибка"; notify "VPN: ошибка"; fi;;
   off)
     stop_all
     rm -f "$HOME/AI/singbox/.connected-since"
