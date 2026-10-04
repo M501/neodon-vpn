@@ -28,6 +28,10 @@ MODE_FILE = os.path.join(HOME, "AI", "singbox", ".mode")
 RAW = os.path.join(HOME, "AI", "neodon-sub", "raw.json")
 SEL_SRV = os.path.join(HOME, "AI", "singbox", "selected-server.json")
 QUOTA = os.path.join(HOME, "AI", "neodon-vpn", "sub-cache.json")
+# DDoS-Guard on the subscription edge hands out challenge cookies; keep them
+# across refreshes (and plugin restarts) so a passed challenge stays passed.
+SUB_COOKIES = os.path.join(HOME, "AI", "neodon-vpn", ".sub-cookies.txt")
+SUB_COOKIES_CURL = os.path.join(HOME, "AI", "neodon-vpn", ".sub-cookies.curl.txt")
 CONVERTER = os.path.join(HOME, "AI", "neodon-sub", "neodon-sub.py")
 
 MODES = ("smart", "full")
@@ -240,7 +244,12 @@ def parse_userinfo(line):
 
 
 def _fetch_sub_urllib(url):
-    jar = http.cookiejar.CookieJar()
+    jar = http.cookiejar.LWPCookieJar(SUB_COOKIES)
+    try:
+        if os.path.exists(SUB_COOKIES):
+            jar.load(ignore_discard=True, ignore_expires=True)
+    except Exception:
+        pass
     op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
     ua = {"User-Agent": "v2rayN/7.24.6"}
 
@@ -249,8 +258,14 @@ def _fetch_sub_urllib(url):
         with op.open(req, timeout=15) as r:
             return r.headers.get("subscription-userinfo", ""), r.read().decode("utf-8", "replace")
 
-    userinfo, _ = get(url)          # pass 1: cookies + userinfo header
-    _, body = get(url)              # pass 2: server list body
+    try:
+        userinfo, _ = get(url)      # pass 1: cookies + userinfo header
+        _, body = get(url)          # pass 2: server list body
+    finally:
+        try:
+            jar.save(ignore_discard=True, ignore_expires=True)
+        except Exception:
+            pass
     return userinfo, body
 
 
@@ -258,13 +273,13 @@ def _fetch_sub_curl(url):
     """curl fallback: its CA handling accepts the chains urllib intermittently
     rejects from the provider's DDoS-Guard edge (owner report 04.10)."""
     with tempfile.TemporaryDirectory() as td:
-        jar = os.path.join(td, "jar")
+        jar = SUB_COOKIES_CURL
 
         def get(u, want_body):
             hpath = os.path.join(td, "h.txt")
             bpath = os.path.join(td, "b.txt")
             p = subprocess.run(
-                ["curl", "-sS", "--compressed", "-A", "v2rayN/7.24.6",
+                ["curl", "-sS", "-L", "--compressed", "-A", "v2rayN/7.24.6",
                  "-c", jar, "-b", jar, "-D", hpath, "-m", "25", "-o", bpath, u],
                 capture_output=True, text=True, timeout=40)
             if p.returncode != 0:
@@ -290,21 +305,29 @@ def _fetch_sub_curl(url):
 
 
 def _fetch_sub(url):
-    """urllib first; on certificate flakes (intermittent from the subscription
-    edge) retry once, then fall back to curl."""
+    """Robust fetch against the provider's DDoS-Guard edge: it intermittently
+    answers 200 / 429 / 307-challenge / TLS resets depending on mood. We retry
+    with growing pauses (cookies persist across attempts) and finish with curl.
+    DNS failures are not retried (nothing to gain while the tunnel is down)."""
     last = None
-    for _ in range(2):
+    for d in (0.0, 1.0, 2.5):
+        if d:
+            time.sleep(d)
         try:
             return _fetch_sub_urllib(url)
         except Exception as e:
             last = e
-            if "CERTIFICATE" not in str(e).upper():
+            s = str(e).lower()
+            if "name resolution" in s or "getaddrinfo" in s or "nodename" in s:
                 raise
-            time.sleep(1.0)
-    try:
-        return _fetch_sub_curl(url)
-    except Exception:
-        raise last
+    for d in (0.0, 2.0):
+        if d:
+            time.sleep(d)
+        try:
+            return _fetch_sub_curl(url)
+        except Exception as e:
+            last = e
+    raise last
 
 
 async def refresh_sub():
@@ -321,6 +344,9 @@ async def refresh_sub():
         data = json.loads(body)
         assert isinstance(data, list) and data and "outbounds" in data[0]
     except (ValueError, AssertionError):
+        head = (body or "")[:600].lower()
+        if "<html" in head or "ddos" in head or "challenge" in head:
+            return {"ok": False, "error": "provider antibot challenge — try again later"}
         return {"ok": False, "error": "bad sub body"}
     try:
         tmp = RAW + ".tmp"
