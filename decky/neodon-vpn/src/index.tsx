@@ -134,7 +134,8 @@ function Content() {
       setMode(dm === "full" ? "full" : "smart");
       const ip: string = st?.exit_ip || "";
       const fr: string = FRIENDLY[actual] || String(actual).toLowerCase();
-      setMeta(fr + (ip ? " · " + ip : ""));
+      const stag: string = shortLabel(String(st?.server_tag || ""));
+      setMeta((stag ? stag + " · " : "") + fr + (ip ? " · " + ip : ""));
       setRulesName(st?.profile_name || st?.profile || "");
       const sv: any = un(svres);
       const list: any[] = sv?.servers || [];
@@ -157,18 +158,34 @@ function Content() {
             : p.kind === "on"
               ? actual === "CONNECTED" || actual === "DEGRADED" || actual === "FAILED" || actual === "LOCKED"
               : actual === "OFF";
-        if (settled || Date.now() - p.ts > 15000) clearPending();
+        if (settled || Date.now() - p.ts > 15000) {
+          call("ui_log", "settle k=" + p.kind + " ai=" + ai + " act=" + actual + " dt=" + (Date.now() - p.ts)).catch(() => {});
+          clearPending();
+        }
       }
       // While our set_server is in flight, keep the user's pick rendered:
       // a stale selected-server.json must not flip the dropdown back.
       const srvBusy = pendRef.current?.kind === "srv";
       if (ai >= 0 && !srvBusy) {
-        if (ai !== seenSrvRef.current) progSrvTsRef.current = Date.now();
+        if (ai !== seenSrvRef.current) {
+          call("ui_log", "srvset ai=" + ai + " prev=" + seenSrvRef.current).catch(() => {});
+          progSrvTsRef.current = Date.now();
+        }
         setSrvIdx(ai);
         seenSrvRef.current = ai;
       }
       const qq: any = un(qres)?.quota;
-      setQuota(qq && qq.used ? String(qq.used) : "");
+      if (qq && qq.used) {
+        let upd = "";
+        if (qq.ts) {
+          const d = new Date(Number(qq.ts) * 1000);
+          const p2 = (n: number) => String(n).padStart(2, "0");
+          upd = " · " + p2(d.getHours()) + ":" + p2(d.getMinutes());
+        }
+        setQuota(String(qq.used) + upd);
+      } else {
+        setQuota("");
+      }
     } catch (e) {
       setMeta("backend offline");
     }
@@ -217,11 +234,12 @@ function Content() {
       // Same value re-fire: either a Steam echo right after our own prop
       // change, or a deliberate re-tap of the same server.
       const isEcho = Date.now() - progSrvTsRef.current < 800;
-      if (isEcho) return;
-      if (pendRef.current) return;               // a switch is already in flight
-      if (stRef.current === "CONNECTED") return; // already connected — no-op
+      if (isEcho) { call("ui_log", "tap-echo i=" + i).catch(() => {}); return; }
+      if (pendRef.current) { call("ui_log", "tap-busy i=" + i).catch(() => {}); return; }
+      if (stRef.current === "CONNECTED") { call("ui_log", "tap-noop i=" + i).catch(() => {}); return; }
       // Deliberate re-tap on a non-connected link: retry (fresh set_server).
     }
+    call("ui_log", "tap i=" + i + " prev=" + seenSrvRef.current + " st=" + stRef.current).catch(() => {});
     seenSrvRef.current = i;
     progSrvTsRef.current = Date.now();
     const label: string = shortLabel(String((servers[i] as any)?.label ?? ""));
@@ -235,8 +253,11 @@ function Content() {
     if (!r?.ok) {
       clearPending();
       showNotice("switch failed: " + shortErr(r?.error || r?.out));
+    } else {
+      call("ui_log", "set-ok i=" + i).catch(() => {});
     }
     setTick((t: number) => t + 1);
+    setTimeout(refresh, 400);
     setTimeout(refresh, 1500);
   }
 
