@@ -1,0 +1,16 @@
+{
+ "description": "Mini phase 1: selector + urltest + Clash API — мгновенное переключение сервера без рестарта, авто-выбор живого (selector тега proxy, apply preferred при старте, killswitch все ноды)",
+ "folderSlug": "selector-instant-switch",
+ "keywords": [
+  "selector",
+  "instant",
+  "switch"
+ ],
+ "lastUpdated": "2026-10-04T03:04:37Z",
+ "level": "2",
+ "memoryNameHistory": [],
+ "memorySequence": 0,
+ "parentChain": [],
+ "specFolder": "036-selector-instant-switch",
+ "specId": "036"
+}

@@ -328,7 +328,7 @@ function Content() {
                     : "VPN", checked: on, onChange: (v) => onToggle(v) }), SP_JSX.jsx(DFL.Dropdown, { rgOptions: [
                     { data: "smart", label: "PROXY" },
                     { data: "full", label: "TUNNEL" },
-                ], selectedOption: mode, onChange: (v) => switchMode(v?.data || "smart"), strDefaultLabel: "Mode" }), SP_JSX.jsx(DFL.Dropdown, { rgOptions: servers, selectedOption: srvIdx, onChange: (v) => switchServer(Number(v?.data ?? 0)), strDefaultLabel: "Server" }), !pend && bad && (SP_JSX.jsx("div", { children: "\u21B3 no link \u2014 pick another server, or tap this one again to retry" })), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: async () => {
+                ], selectedOption: mode, onChange: (v) => switchMode(v?.data || "smart"), strDefaultLabel: "Mode" }), SP_JSX.jsx(DFL.Dropdown, { rgOptions: servers, selectedOption: srvIdx, onChange: (v) => switchServer(Number(v?.data ?? 0)), strDefaultLabel: "Server" }, "srv-" + srvIdx), !pend && bad && (SP_JSX.jsx("div", { children: "\u21B3 no link \u2014 pick another server, or tap this one again to retry" })), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: async () => {
                     showNotice("refreshing subscription…");
                     try {
                         const r = un(await call("refresh_sub"));
