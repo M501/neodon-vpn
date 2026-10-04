@@ -255,7 +255,7 @@ def _fetch_sub_urllib(url):
 
     def get(u):
         req = urllib.request.Request(u, headers=ua)
-        with op.open(req, timeout=15) as r:
+        with op.open(req, timeout=8) as r:
             return r.headers.get("subscription-userinfo", ""), r.read().decode("utf-8", "replace")
 
     try:
@@ -280,8 +280,8 @@ def _fetch_sub_curl(url):
             bpath = os.path.join(td, "b.txt")
             p = subprocess.run(
                 ["curl", "-sS", "-L", "--compressed", "-A", "v2rayN/7.24.6",
-                 "-c", jar, "-b", jar, "-D", hpath, "-m", "25", "-o", bpath, u],
-                capture_output=True, text=True, timeout=40)
+                 "-c", jar, "-b", jar, "-D", hpath, "-m", "15", "-o", bpath, u],
+                capture_output=True, text=True, timeout=25, env=_clean_env())
             if p.returncode != 0:
                 raise RuntimeError("curl rc=%d: %s" % (p.returncode, (p.stderr or "").strip()[:100]))
             ui = ""
@@ -310,7 +310,7 @@ def _fetch_sub(url):
     with growing pauses (cookies persist across attempts) and finish with curl.
     DNS failures are not retried (nothing to gain while the tunnel is down)."""
     last = None
-    for d in (0.0, 1.0, 2.5):
+    for d in (0.0, 1.5):
         if d:
             time.sleep(d)
         try:
@@ -339,7 +339,8 @@ async def refresh_sub():
         userinfo, body = await asyncio.wait_for(
             asyncio.to_thread(_fetch_sub, url), 60)
     except Exception as e:
-        return {"ok": False, "error": "fetch: %s" % str(e)[:120]}
+        msg = str(e)[:120] or type(e).__name__
+        return {"ok": False, "error": "fetch: %s" % msg}
     try:
         data = json.loads(body)
         assert isinstance(data, list) and data and "outbounds" in data[0]
@@ -414,3 +415,8 @@ class Plugin:
         r = await refresh_sub()
         _log("refresh_sub -> ok=%s err=%s" % (r.get("ok"), str(r.get("error") or "")[:140]))
         return r
+
+    async def ui_log(self, text):
+        # panel-side telemetry: visible in `journalctl -u plugin_loader | grep 'ui:'`
+        _log("ui: %s" % str(text)[:300])
+        return {"ok": True}
