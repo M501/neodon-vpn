@@ -1,0 +1,16 @@
+{
+ "description": "Neodon панель Decky: отзывчивое переключение сервера и понятные статусы — мгновенный switching-индикатор, человеческие тексты вместо сырых FAILED/urlopen, ретрай повторного тапа по серверу, TTL transition-маркера 12с, ранняя запись selected-server.json",
+ "folderSlug": "panel-switch-ux",
+ "keywords": [
+  "panel",
+  "switch",
+  "ux"
+ ],
+ "lastUpdated": "2026-10-04T00:52:38Z",
+ "level": "2",
+ "memoryNameHistory": [],
+ "memorySequence": 0,
+ "parentChain": [],
+ "specFolder": "035-panel-switch-ux",
+ "specId": "035"
+}

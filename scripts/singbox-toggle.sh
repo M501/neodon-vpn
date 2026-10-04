@@ -101,7 +101,8 @@ status-json)
     desired=$(cat "$MODE_FILE" 2>/dev/null || echo unknown)
     transitioning=false
     if [ -f "$TRANS_MARKER" ]; then
-      if [ "$(( $(date +%s) - $(stat -c %Y "$TRANS_MARKER" 2>/dev/null || echo 0) ))" -gt 30 ]; then
+      # TTL 12s (was 30): a switch takes 2-6s; a long TRANSITIONING felt stuck
+      if [ "$(( $(date +%s) - $(stat -c %Y "$TRANS_MARKER" 2>/dev/null || echo 0) ))" -gt 12 ]; then
         rm -f "$TRANS_MARKER"
       else
         transitioning=true

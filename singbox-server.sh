@@ -115,6 +115,22 @@ for p in (cfg, cfg_full, cfg_proxy):
         f.write("\n")
 PY
   if "$SB" check -c "$CFG" >/dev/null 2>&1 && "$SB" check -c "$CFG_FULL" >/dev/null 2>&1 && { [ ! -f "$CFG_PROXY" ] || "$SB" check -c "$CFG_PROXY" >/dev/null 2>&1; }; then
+    # Persist the choice BEFORE the restart: the QAM panel and status read
+    # selected-server.json; writing it late made the UI show the old server
+    # for seconds after a switch (owner report 04.10).
+    TAG=$(python3 - "$RAW" "$n" 2>/dev/null <<'PYEOF2'
+import json,sys
+try: print(json.load(open(sys.argv[1]))[int(sys.argv[2])].get("remarks",""))
+except: print("")
+PYEOF2
+)
+    if [ -z "$TAG" ]; then TAG=$(echo "$out" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("server",""))'); fi
+    python3 - "$out" "$TAG" <<'PYEOF3' 2>/dev/null || true
+import json, time, sys, os
+out=json.loads(sys.argv[1]); tag=sys.argv[2]
+sel={"tag": tag or out.get("server",""), "server": out["server"], "server_port": out["server_port"], "updated": time.strftime("%Y-%m-%dT%H:%M:%S")}
+open(os.path.expanduser("~/AI/singbox/selected-server.json"),"w").write(json.dumps(sel, ensure_ascii=False, indent=2))
+PYEOF3
     st=$(systemctl --user is-active sing-box.service 2>/dev/null)
     stf=$(systemctl --user is-active sing-box-full.service 2>/dev/null)
     if [ "$st" = active ] || [ "$st" = activating ]; then
@@ -129,20 +145,6 @@ PY
       for i in $(seq 1 50); do systemctl --user is-active sing-box-full.service | grep -q active && break; sleep 0.2; done
       bash ~/AI/singbox/killswitch.sh install >/dev/null 2>&1 && echo "KILLSWITCH: allowlist обновлён под " || echo "WARN: killswitch reinstall failed"
     fi
-      # sync GUI header tag
-    TAG=$(python3 - "$RAW" "$n" 2>/dev/null <<'PYEOF2'
-import json,sys
-try: print(json.load(open(sys.argv[1]))[int(sys.argv[2])].get("remarks",""))
-except: print("")
-PYEOF2
-)
-    if [ -z "$TAG" ]; then TAG=$(echo "$out" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("server",""))'); fi
-    python3 - "$out" "$TAG" <<'PYEOF3' 2>/dev/null || true
-import json, time, sys, os
-out=json.loads(sys.argv[1]); tag=sys.argv[2]
-sel={"tag": tag or out.get("server",""), "server": out["server"], "server_port": out["server_port"], "updated": time.strftime("%Y-%m-%dT%H:%M:%S")}
-open(os.path.expanduser("~/AI/singbox/selected-server.json"),"w").write(json.dumps(sel, ensure_ascii=False, indent=2))
-PYEOF3
     :  # notify-popup отключён (owner 2026-09-26)
     echo "OK: переключено на сервер $name"
   else
