@@ -10,7 +10,7 @@ import {
 import { definePlugin, call } from "@decky/api";
 import { FaShieldAlt } from "react-icons/fa";
 
-type Mode = "smart" | "full";
+type Mode = "smart" | "full" | "proxy";
 
 // Loader answers {result: ...} over WS; unwrap defensively (ponytail:
 // one line, covers both wrapped and raw shapes).
@@ -65,6 +65,12 @@ function Content() {
   const sinceRef = useRef<number>(0);
   const [servers, setServers] = useState<DropdownOption[]>([]);
   const [srvIdx, setSrvIdx] = useState<number>(0);
+  // Overlapping polls: a slow status probe (up to 30 s) must not stack ticks.
+  const busyRef = useRef<boolean>(false);
+  // Mode pick: shown immediately and kept for 8 s, like the power switch — without
+  // it the dropdown snapped back for one poll and then flipped (the panel looked
+  // broken while the backend was simply still switching).
+  const modeWantRef = useRef<{ v: Mode; ts: number } | null>(null);
   const [quota, setQuota] = useState<string>("");
   const [rulesName, setRulesName] = useState<string>("");
   const [notice, setNotice] = useState<string>("");
@@ -99,6 +105,8 @@ function Content() {
   }
 
   async function refresh() {
+    if (busyRef.current) return;      // a slow probe must not stack polls
+    busyRef.current = true;
     try {
       // One round trip, not three: panel syncs in ~1 poll, not ~3.
       const [sres, svres, qres]: any[] = await Promise.all([
@@ -131,9 +139,17 @@ function Content() {
       } else {
         sinceRef.current = 0;
       }
-      setMode(dm === "full" ? "full" : "smart");
+      // Mode follows the backend, but our own pick wins while it is in flight
+      // (same quiet-window idea as the power switch).
+      const mq = modeWantRef.current;
+      if (!(mq && Date.now() - mq.ts < 8000)) {
+        setMode(dm === "full" ? "full" : dm === "proxy" ? "proxy" : "smart");
+      }
       const ip: string = st?.exit_ip || "";
-      const fr: string = FRIENDLY[actual] || String(actual).toLowerCase();
+      // A failed status must not masquerade as a real link state.
+      const fr: string = ok
+        ? (FRIENDLY[actual] || String(actual).toLowerCase())
+        : ("status: " + shortErr(st?.error || "unreadable"));
       const stag: string = shortLabel(String(st?.server_tag || ""));
       setMeta((stag ? stag + " · " : "") + fr + (ip ? " · " + ip : ""));
       setRulesName(st?.profile_name || st?.profile || "");
@@ -188,6 +204,8 @@ function Content() {
       }
     } catch (e) {
       setMeta("backend offline");
+    } finally {
+      busyRef.current = false;
     }
     // First paint must never claim OFF: remount starts false, truth arrives late.
     setSynced(true);
@@ -224,12 +242,16 @@ function Content() {
   }
 
   async function switchMode(m: Mode) {
-    await call("set_mode", m);
+    modeWantRef.current = { v: m, ts: Date.now() };
+    setMode(m);                        // instant feedback, no snap-back
+    const r: any = un(await call("set_mode", m));
+    if (!r?.ok) showNotice("mode: " + shortErr(r?.error || r?.out));
     setTimeout(refresh, 1200);
   }
 
   async function switchServer(i: number) {
-    if (servers.length === 0) return;
+    // a malformed dropdown event must never silently pick the first server
+    if (!Number.isInteger(i) || i < 0 || i >= servers.length) return;
     if (i === seenSrvRef.current) {
       // Same value re-fire: either a Steam echo right after our own prop
       // change, or a deliberate re-tap of the same server.
@@ -293,6 +315,9 @@ function Content() {
         rgOptions={[
           { data: "smart", label: "PROXY" },
           { data: "full", label: "TUNNEL" },
+          // shown only when the backend really is in socks-only mode, so the panel
+          // never displays a mode it does not have (and never silently switches it)
+          ...(mode === "proxy" ? [{ data: "proxy", label: "PROXY (no TUN)" }] : []),
         ]}
         selectedOption={mode}
         onChange={(v: any) => switchMode((v?.data as Mode) || "smart")}

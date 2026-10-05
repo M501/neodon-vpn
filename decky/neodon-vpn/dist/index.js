@@ -133,6 +133,12 @@ function Content() {
     const sinceRef = SP_REACT.useRef(0);
     const [servers, setServers] = SP_REACT.useState([]);
     const [srvIdx, setSrvIdx] = SP_REACT.useState(0);
+    // Overlapping polls: a slow status probe (up to 30 s) must not stack ticks.
+    const busyRef = SP_REACT.useRef(false);
+    // Mode pick: shown immediately and kept for 8 s, like the power switch — without
+    // it the dropdown snapped back for one poll and then flipped (the panel looked
+    // broken while the backend was simply still switching).
+    const modeWantRef = SP_REACT.useRef(null);
     const [quota, setQuota] = SP_REACT.useState("");
     const [rulesName, setRulesName] = SP_REACT.useState("");
     const [notice, setNotice] = SP_REACT.useState("");
@@ -164,6 +170,9 @@ function Content() {
         setTick((t) => t + 1);
     }
     async function refresh() {
+        if (busyRef.current)
+            return; // a slow probe must not stack polls
+        busyRef.current = true;
         try {
             // One round trip, not three: panel syncs in ~1 poll, not ~3.
             const [sres, svres, qres] = await Promise.all([
@@ -196,9 +205,17 @@ function Content() {
             else {
                 sinceRef.current = 0;
             }
-            setMode(dm === "full" ? "full" : "smart");
+            // Mode follows the backend, but our own pick wins while it is in flight
+            // (same quiet-window idea as the power switch).
+            const mq = modeWantRef.current;
+            if (!(mq && Date.now() - mq.ts < 8000)) {
+                setMode(dm === "full" ? "full" : dm === "proxy" ? "proxy" : "smart");
+            }
             const ip = st?.exit_ip || "";
-            const fr = FRIENDLY[actual] || String(actual).toLowerCase();
+            // A failed status must not masquerade as a real link state.
+            const fr = ok
+                ? (FRIENDLY[actual] || String(actual).toLowerCase())
+                : ("status: " + shortErr(st?.error || "unreadable"));
             const stag = shortLabel(String(st?.server_tag || ""));
             setMeta((stag ? stag + " · " : "") + fr + (ip ? " · " + ip : ""));
             setRulesName(st?.profile_name || st?.profile || "");
@@ -251,6 +268,9 @@ function Content() {
         catch (e) {
             setMeta("backend offline");
         }
+        finally {
+            busyRef.current = false;
+        }
         // First paint must never claim OFF: remount starts false, truth arrives late.
         setSynced(true);
     }
@@ -283,11 +303,16 @@ function Content() {
         power(v);
     }
     async function switchMode(m) {
-        await call("set_mode", m);
+        modeWantRef.current = { v: m, ts: Date.now() };
+        setMode(m); // instant feedback, no snap-back
+        const r = un(await call("set_mode", m));
+        if (!r?.ok)
+            showNotice("mode: " + shortErr(r?.error || r?.out));
         setTimeout(refresh, 1200);
     }
     async function switchServer(i) {
-        if (servers.length === 0)
+        // a malformed dropdown event must never silently pick the first server
+        if (!Number.isInteger(i) || i < 0 || i >= servers.length)
             return;
         if (i === seenSrvRef.current) {
             // Same value re-fire: either a Steam echo right after our own prop
@@ -355,6 +380,9 @@ function Content() {
                     : "VPN", checked: on, onChange: (v) => onToggle(v) }), SP_JSX.jsx(DFL.Dropdown, { rgOptions: [
                     { data: "smart", label: "PROXY" },
                     { data: "full", label: "TUNNEL" },
+                    // shown only when the backend really is in socks-only mode, so the panel
+                    // never displays a mode it does not have (and never silently switches it)
+                    ...(mode === "proxy" ? [{ data: "proxy", label: "PROXY (no TUN)" }] : []),
                 ], selectedOption: mode, onChange: (v) => switchMode(v?.data || "smart"), strDefaultLabel: "Mode" }), SP_JSX.jsx(DFL.Dropdown, { rgOptions: servers, selectedOption: srvIdx, onChange: (v) => switchServer(Number(v?.data ?? 0)), strDefaultLabel: "Server" }, "srv-" + srvIdx), !pend && bad && (SP_JSX.jsx("div", { children: "\u21B3 no link \u2014 pick another server, or tap this one again to retry" })), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: async () => {
                     showNotice("refreshing subscription…");
                     try {

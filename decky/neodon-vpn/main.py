@@ -62,9 +62,12 @@ def _log(msg):
 
 
 def _clean_env():
-    # Decky >=3.1 ships LD_LIBRARY_PATH that breaks subprocess (libcrypto).
+    # Decky >=3.1 ships LD_LIBRARY_PATH that breaks subprocesses (libcrypto); blank it
+    # and drop the other loader variables a PyInstaller bundle can inject.
     env = dict(os.environ)
     env["LD_LIBRARY_PATH"] = ""
+    for _k in ("LD_PRELOAD",):
+        env.pop(_k, None)
     # `systemctl --user` needs the session bus; the loader does not always
     # pass XDG_RUNTIME_DIR down to plugin backends. Without it _service_since
     # always failed, so the QAM clock restarted from zero on every open.
@@ -188,9 +191,9 @@ def _server_list():
 
 async def get_servers():
     sel = _read_json(SEL_SRV) or {}
-    # selected-server.json stores the key as "server" (not "address").
-    return {"ok": True, "servers": _server_list(),
-            "active": sel.get("server") or sel.get("address")}
+    # selected-server.json stores the key as "server" (that is the only key written;
+    # the desktop GUI matches on the tag first, then on the same address)
+    return {"ok": True, "servers": _server_list(), "active": sel.get("server")}
 
 
 async def set_server(idx):
