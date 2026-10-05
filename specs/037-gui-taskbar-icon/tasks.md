@@ -63,7 +63,7 @@ _memory:
 - [x] T005 [P] Синхронизировать tests/app/neodon-vpn.py
 - [x] T006 Деплой live SFTP + md5-сверка всех трёх копий (md5 `3d5938ce…` ×3)
 - [x] T007 CHANGES.md: запись (2026-10-05 (66))
-- [B] T012 git commit CHANGES.md + push в GitHub — ждёт завершения внешнего merge «reconcile M5/device series» (started 05:36; не мой процесс, не вмешивался)
+- [x] T012 git commit + push в GitHub — выполнено параллельным reconcile-процессом: merge `82c8d58`, CHANGES+tasks `8e8dd1b`, summary+spec `f4a5bff` (origin/master = `f4a5bff`)
 <!-- /ANCHOR:phase-2 -->
 
 ---
