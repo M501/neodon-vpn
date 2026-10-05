@@ -360,8 +360,15 @@ def load_servers():
         data = json.load(open(RAW))
     except Exception:
         return []
+    # a truncated/hand-edited subscription file can parse as something that is not a
+    # list of configs (dict, string, null) — iterating that used to raise AttributeError
+    # out of MainWindow.__init__ and the app simply would not start
+    if not isinstance(data, list):
+        return []
     out = []
     for cfg in data:
+        if not isinstance(cfg, dict):
+            continue
         for o in cfg.get("outbounds") or []:
             if o.get("protocol") != "vless":
                 continue
@@ -2286,9 +2293,12 @@ class MainWindow(QMainWindow):
         else:
             reason, cached = self._sub_cache_or_reason(out, line)
             if cached:
-                self.sub_progress.setValue(cached[0])
-                self.sub_used.setText(cached[1] + " (cached)")
-                self.sub_expire.setText(cached[2])
+                try:
+                    self.sub_progress.setValue(int(cached[0]))
+                except (TypeError, ValueError):
+                    self.sub_progress.setValue(0)
+                self.sub_used.setText(str(cached[1]) + " (cached)")
+                self.sub_expire.setText(str(cached[2]))
             else:
                 self.sub_progress.setValue(0)
                 self.sub_used.setText("N/A")
