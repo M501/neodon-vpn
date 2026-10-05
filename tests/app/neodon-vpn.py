@@ -1633,6 +1633,30 @@ class MainWindow(QMainWindow):
                         pass
                 elif isinstance(hook, dict) and hook.get("action") == "refresh":
                     self.refresh_sub()
+                elif isinstance(hook, dict) and hook.get("action") == "toggle":
+                    # QA backdoor: drive the primary user path (power) exactly as a
+                    # tap would — needed to test connect/disconnect remotely
+                    self.on_power()
+                elif isinstance(hook, dict) and hook.get("action") == "server":
+                    self._select_server_idx(int(hook.get("idx") or 0))
+                elif isinstance(hook, dict) and hook.get("action") == "set_mode":
+                    self.set_mode(hook.get("mode") or "smart", restart=True)
+                elif isinstance(hook, dict) and hook.get("action") == "state":
+                    # QA backdoor: dump the live state machine as JSON
+                    try:
+                        with open(os.path.expanduser(hook.get("path") or "~/neodon-state.json"), "w") as _f:
+                            json.dump({"state": self.state, "connected": self.connected,
+                                       "desired": self.desired, "mode": self.mode,
+                                       "off_streak": getattr(self, "_off_streak", 0),
+                                       "epoch_set": getattr(self, "_epoch", None) is not None,
+                                       "timer": self.timer_lbl.text(),
+                                       "pill": self.pill.text(),
+                                       "op_in_progress": self._op_in_progress,
+                                       "pending": self._pending,
+                                       "selected_tag": self.selected_tag,
+                                       "active_idx": self.active_idx}, _f, ensure_ascii=False)
+                    except (OSError, RuntimeError, ValueError):
+                        pass
                 elif isinstance(hook, dict) and hook.get("action") == "scroll":
                     # QA backdoor: scroll current page without synthetic touch
                     try:
@@ -1702,10 +1726,15 @@ class MainWindow(QMainWindow):
             self._off_streak = 0
             _new = "CONNECTED"
         elif (_cur == "CONNECTED"
-                and _raw in ("CONNECTING", "DEGRADED", "STARTING", "TRANSITIONING")
+                and _raw != "LOCKED"
                 and _desired_now == getattr(self, "_last_desired", _desired_now)):
-            # wobble guard: one slow curl must not flap the pill/timer;
-            # user switching modes (desired changed) bypasses immediately
+            # wobble guard for EVERY contradicting poll, not only the "in between"
+            # states: a single failed exit-IP probe used to flip the pill to
+            # "Not connected" instantly while the session timer kept counting for
+            # another 24 s — the UI contradicted itself. Three consecutive
+            # contradictions (≈24 s at the 8 s poll) mean it is real. Exceptions:
+            # LOCKED (fail-closed firewall up = honest hard state) and a desired the
+            # user just changed (an explicit OFF must land immediately).
             self._off_streak = getattr(self, "_off_streak", 0) + 1
             _new = "CONNECTED" if self._off_streak < 3 else _raw
         else:
@@ -1728,13 +1757,15 @@ class MainWindow(QMainWindow):
         # debounced state, not the raw field: during a single status blip the pill
         # keeps CONNECTED, and a power tap then means "turn off", not "on" again
         self.connected = self.state == "CONNECTED"
+        # The timer base lives exactly as long as the CONNECTED state does: whatever
+        # path flipped us out of CONNECTED (debounce, explicit OFF, LOCKED, FAILED),
+        # the session timer clears in the SAME step. Before, only the debounced path
+        # cleared it, so an explicit OFF left the timer counting under "Not connected".
         if self.state == "CONNECTED":
             if getattr(self, "_epoch", None) is None:
                 self._epoch = seed_epoch()
         else:
-            # streak already counted above; timer clears only at 3 misses
-            if self._off_streak >= 3:
-                self._epoch = None
+            self._epoch = None
         dm = d.get("desired_mode")
         self.desired = "full" if dm == "full" else "smart"
         if self.state == "OFF":
