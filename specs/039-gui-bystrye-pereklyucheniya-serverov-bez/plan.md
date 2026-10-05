@@ -20,7 +20,7 @@ _memory:
     session_dedup:
       fingerprint: "sha256:0d62fed10591cd75dd55ff7121bac1859a7b70ba1fb7b0250cbc5c211270aaa7"
       session_id: "main-20261005"
-      parent_session_id: "038-gui-podsvetka-vybrannogo-servera-kogda-v"
+      parent_session_id: null
     completion_pct: 50
     open_questions: []
     answered_questions: []
@@ -33,8 +33,8 @@ _memory:
 
 ---
 
-<!-- ANCHOR:summary -->
 
+<!-- ANCHOR:summary -->
 ## 1. SUMMARY
 
 ### Technical Context
@@ -49,12 +49,12 @@ _memory:
 Единый владелец состояния выбора (интент пользователя), перерисовка подсветки на месте без пересборки
 сетки карточек, корректная обработка второго быстрого тапа (Qt отдаёт его нажатие в QWindow), флаг DE
 из того же набора, что и остальные, и закрытие подтверждённых аудитом дефектов.
-<!-- /ANCHOR:summary -->
 
 ---
+<!-- /ANCHOR:summary -->
+
 
 <!-- ANCHOR:quality-gates -->
-
 ## 2. QUALITY GATES
 
 ### Definition of Ready
@@ -67,12 +67,12 @@ _memory:
 - [ ] `py_compile` обеих копий; offscreen-проба геометрии зелёная
 - [ ] Живой GUI перезапущен на новом билде, снимки до/после сняты
 - [ ] `validate.sh --strict` PASSED, CHANGES.md, коммит и пуш
-<!-- /ANCHOR:quality-gates -->
 
 ---
+<!-- /ANCHOR:quality-gates -->
+
 
 <!-- ANCHOR:architecture -->
-
 ## 3. ARCHITECTURE
 
 ### Pattern
@@ -87,12 +87,12 @@ _memory:
 ### Data Flow
 тап → интент → `set N` (бэкенд пишет `selected-server.json` первым) → подтверждение файлом → снятие интента.
 Полл `status-json` → `server_tag` → применим только при отсутствии интента и вне settle-окна.
-<!-- /ANCHOR:architecture -->
 
 ---
+<!-- /ANCHOR:architecture -->
+
 
 <!-- ANCHOR:affected-surfaces -->
-
 ## FIX ADDENDUM: AFFECTED SURFACES
 | Surface | Current Role | Action | Verification |
 |---------|--------------|--------|--------------|
@@ -105,12 +105,12 @@ _memory:
 | control-plane скрипты / Decky-панель | вне правки | audit-only | отчёты ревьюеров + отдельные фиксы при подтверждении |
 
 Инварианты: выбор никогда не включает VPN; жест никогда не меняет выбор; живая нода ≠ выбор.
-<!-- /ANCHOR:affected-surfaces -->
 
 ---
+<!-- /ANCHOR:affected-surfaces -->
+
 
 <!-- ANCHOR:phases -->
-
 ## 4. IMPLEMENTATION PHASES
 
 ### Phase 1: Диагностика (выполнено)
@@ -129,12 +129,12 @@ _memory:
 - [ ] Приёмочный прогон `verify039c` (тапы любой скорости, жесты, внешний выбор)
 - [ ] Регресс: свайпы вертикальные/горизонтальные, `hRange = 0`, флаг DE
 - [ ] Документы, CHANGES.md, коммит и пуш
-<!-- /ANCHOR:phases -->
 
 ---
+<!-- /ANCHOR:phases -->
+
 
 <!-- ANCHOR:testing -->
-
 ## 5. TESTING STRATEGY
 
 | Test Type | Scope | Tools |
@@ -143,12 +143,12 @@ _memory:
 | Снимки окна | подсветка выбора, флаг | хук `gui-action.json` + разбор пикселей |
 | Проба геометрии | горизонтальные диапазоны страниц | offscreen-импорт модуля GUI |
 | Аудит | статический разбор трёх слоёв | три read-only ревьюера |
-<!-- /ANCHOR:testing -->
 
 ---
+<!-- /ANCHOR:testing -->
+
 
 <!-- ANCHOR:dependencies -->
-
 ## 6. DEPENDENCIES
 
 | Dependency | Type | Status | Impact if Blocked |
@@ -156,23 +156,23 @@ _memory:
 | Clash API `:9090` | Internal | Green | OFF → нет метки живой ноды |
 | `selected-server.json` | Internal | Green | нет файла → нет подсветки |
 | SSH на 192.168.3.2 | External | Green | нет деплоя/проверки |
-<!-- /ANCHOR:dependencies -->
 
 ---
+<!-- /ANCHOR:dependencies -->
+
 
 <!-- ANCHOR:rollback -->
-
 ## 7. ROLLBACK PLAN
 
 - **Trigger**: тап перестал работать; выбор меняется жестом; флаг ломает вёрстку карточки.
 - **Procedure**: живая копия — `/home/m26/AI/neodon-vpn/neodon-vpn.py.pre038` (для 039 держим свежий бэкап `.pre039`),
   рестарт `neodon-gui-live.service`; репо — `git checkout -- neodon-vpn.py tests/app/neodon-vpn.py`.
-<!-- /ANCHOR:rollback -->
 
 ---
+<!-- /ANCHOR:rollback -->
 
-<!-- ANCHOR:effort -->
 
+<!-- ANCHOR:phase-deps -->
 ## L2: PHASE DEPENDENCIES
 
 | Phase | Depends on | Blocks |
@@ -182,12 +182,12 @@ _memory:
 | Аудит | читаемое состояние репозитория | фиксы аудита (правки GUI не блокирует) |
 | Фиксы control-plane | подтверждение находки про `off` | живую проверку `off` |
 | Приёмка | правки и деплой | коммит и релиз |
-<!-- /ANCHOR:phase-deps -->
 
 ---
+<!-- /ANCHOR:phase-deps -->
 
-<!-- ANCHOR:enhanced-rollback -->
 
+<!-- ANCHOR:effort -->
 ## L2: EFFORT ESTIMATION
 
 | Phase | Effort | Notes |
@@ -197,12 +197,12 @@ _memory:
 | Аудит и разбор находок | ~1.5 ч | три ревьюера + собственная проверка каждой находки |
 | Фиксы аудита и control-plane | ~1 ч | 9 фиксов, включая честный `off` |
 | Приёмка и документы | ~1 ч | синтетический тач, снимки, спека, CHANGES |
-<!-- /ANCHOR:effort -->
 
 ---
+<!-- /ANCHOR:effort -->
 
-<!-- ANCHOR:phase-deps -->
 
+<!-- ANCHOR:enhanced-rollback -->
 ## L2: ENHANCED ROLLBACK
 
 | Level | Action | Trigger |

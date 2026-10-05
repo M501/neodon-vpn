@@ -21,7 +21,7 @@ _memory:
     session_dedup:
       fingerprint: "sha256:0d62fed10591cd75dd55ff7121bac1859a7b70ba1fb7b0250cbc5c211270aaa7"
       session_id: "main-20261005"
-      parent_session_id: "038-gui-podsvetka-vybrannogo-servera-kogda-v"
+      parent_session_id: null
     completion_pct: 40
     open_questions: []
     answered_questions: []
@@ -34,8 +34,8 @@ _memory:
 
 ---
 
-<!-- ANCHOR:metadata -->
 
+<!-- ANCHOR:metadata -->
 ## 1. METADATA
 
 | Field | Value |
@@ -45,12 +45,12 @@ _memory:
 | **Status** | In Progress |
 | **Created** | 2026-10-05 |
 | **Branch** | `039-gui-bystrye-pereklyucheniya-serverov-bez` |
-<!-- /ANCHOR:metadata -->
 
 ---
+<!-- /ANCHOR:metadata -->
+
 
 <!-- ANCHOR:problem -->
-
 ## 2. PROBLEM & PURPOSE
 
 ### Problem Statement
@@ -65,12 +65,12 @@ _memory:
 
 ### Purpose
 Быстрое переключение серверов в десктоп-GUI работает на любой скорости без «прыжков» выделения и без ложных выборов от жестов; все страны подписки показываются с флагом; подтверждённые аудитом дефекты закрыты.
-<!-- /ANCHOR:problem -->
 
 ---
+<!-- /ANCHOR:problem -->
+
 
 <!-- ANCHOR:scope -->
-
 ## 3. SCOPE
 
 ### In Scope
@@ -93,12 +93,12 @@ _memory:
 | `flags/DE.png` | Create | немецкий флаг (flagcdn w40, как остальные) |
 | `CHANGES.md` | Modify | запись с пруфами |
 | `specs/039-.../` | Create | спека + план + задачи + сводка + `scratch/` (скрипты проверки) |
-<!-- /ANCHOR:scope -->
 
 ---
+<!-- /ANCHOR:scope -->
+
 
 <!-- ANCHOR:requirements -->
-
 ## 4. REQUIREMENTS
 
 ### P0 - Blockers (MUST complete)
@@ -118,24 +118,24 @@ _memory:
 | REQ-106 | Переключение из панели Decky отражается | Внешний `set N` при OFF → в пределах полла подсветка переезжает |
 | REQ-107 | Одиночный тап и внешний выбор не сломаны | Одиночный тап выбирает; внешний `set 1` перекрашивает нужную карточку |
 | REQ-108 | Аудит-находки закрыты или явно отложены | По каждому подтверждённому дефекту: фикс + проверка, либо строка «отложено» с причиной |
-<!-- /ANCHOR:requirements -->
 
 ---
+<!-- /ANCHOR:requirements -->
+
 
 <!-- ANCHOR:success-criteria -->
-
 ## 5. SUCCESS CRITERIA
 
 - **SC-101**: `selected-server.json` и подсветка совпадают после каждого сценария (тап, двойной тап, жест, внешний `set`).
 - **SC-102**: ни один жест не меняет выбор; прокрутка при этом работает (сдвиг контента ≠ 0).
 - **SC-103**: md5 живой копии = repo root = `tests/app`; `validate.sh --strict` PASSED.
 
-<!-- /ANCHOR:success-criteria -->
 
 ---
+<!-- /ANCHOR:success-criteria -->
+
 
 <!-- ANCHOR:risks -->
-
 ## 6. RISKS & DEPENDENCIES
 
 | Type | Item | Impact | Mitigation |
@@ -145,6 +145,10 @@ _memory:
 | Risk | Эвристика второго тапа может признать тапом лишний жест | Средний | правило ограничено окном 0.6 с и требует неподвижного скролла; отдельный тест «overscroll при неизменном скролле» |
 | Risk | Qt-поведение DblClick зависит от системного интервала двойного клика | Низкий | окно 0.6 с шире типового интервала (обычно 0.4 с) |
 | Risk | Живой процесс держит старый код | Средний | рестарт GUI + пиксельная проба до/после |
+
+
+---
+<!-- /ANCHOR:risks -->
 
 ## 7. AUDIT FINDINGS (три независимых read-only ревью: GUI, control-plane, Decky)
 
@@ -165,6 +169,7 @@ _memory:
 | A13 | minor (отложено) | `scripts/singbox-toggle.sh` `locked` | Проба фаервола только для `full|off`: при рассинхроне `.mode=smart` + REJECT состояние LOCKED не видно | ОТЛОЖЕНО: безусловная проба = `sudo` на каждом полле статуса (8 с) | — |
 | A14 | minor (отложено) | `neodon-sub.py`, `.mode`/`.desired`, sudoers-шаблон | Жёсткие `/home/m26` и неатомарная запись `raw.json`; heal пишет `.mode=off`, не трогая `.desired`; в шаблоне sudoers нет `ip rule/route/link` | ОТЛОЖЕНО: на этом хосте не проявляется | — |
 
+<!-- ANCHOR:nfr -->
 ## L2: NON-FUNCTIONAL REQUIREMENTS
 
 | Category | Requirement | Verification |
@@ -175,12 +180,12 @@ _memory:
 | Безопасность | ссылка подписки не может испортить конвертер подписки | проверка `save_sub_url` на кавычки и переводы строк |
 | Данные | одновременные refresh не перезаписывают `raw.json` половинчатым телом | флаг `_sub_busy` + имена временных файлов с PID |
 | Честность интерфейса | `off` не рапортует «internet via ISP», пока REJECT на месте | живой прогон smart→off |
-<!-- /ANCHOR:nfr -->
 
 ---
+<!-- /ANCHOR:nfr -->
+
 
 <!-- ANCHOR:edge-cases -->
-
 ## L2: EDGE CASES
 
 | Case | Expected behavior | Verified |
@@ -196,6 +201,7 @@ _memory:
 | Два refresh подписки подряд | второй отклоняется, `raw.json` не портится | по коду + флаг `_sub_busy` |
 <!-- /ANCHOR:edge-cases -->
 
+<!-- ANCHOR:complexity -->
 ## L2: COMPLEXITY ASSESSMENT
 
 | Aspect | Value |
@@ -205,16 +211,15 @@ _memory:
 | Новых сущностей | 3 (`_sel_intent`, `_paint_selection()`, `_LAST_TAP`) |
 | Точка риска | правило второго тапа (свежесть + неподвижный скролл) |
 | Обратимость | полная: `.pre038`/`.pre039` на устройстве и история git |
+
+---
 <!-- /ANCHOR:complexity -->
 
----
 
-<!-- ANCHOR:nfr -->
-
-## 10. OPEN QUESTIONS
+<!-- ANCHOR:questions -->
+## 7. OPEN QUESTIONS
 - Нужен ли тап-инпут на уровне viewport (обработка TouchBegin/TouchEnd в фильтре) вместо эвристики по времени? Решать только если эвристика даст ложные срабатывания в поле.
+
+---
 <!-- /ANCHOR:questions -->
 
----
-
-<!-- ANCHOR:complexity -->

@@ -20,7 +20,7 @@ _memory:
     session_dedup:
       fingerprint: "sha256:0d62fed10591cd75dd55ff7121bac1859a7b70ba1fb7b0250cbc5c211270aaa7"
       session_id: "main-20261005"
-      parent_session_id: "038-gui-podsvetka-vybrannogo-servera-kogda-v"
+      parent_session_id: null
     completion_pct: 90
     open_questions: []
     answered_questions: []
@@ -40,9 +40,9 @@ _memory:
 | **Spec Folder** | 039-gui-bystrye-pereklyucheniya-serverov-bez |
 | **Completed** | 2026-10-05 |
 | **Level** | 1 |
-<!-- /ANCHOR:metadata -->
 
 ---
+<!-- /ANCHOR:metadata -->
 
 <!-- ANCHOR:what-built -->
 ## What Was Built
@@ -72,17 +72,17 @@ _memory:
 | `flags/DE.png` | Created | немецкий флаг |
 | `scripts/singbox-toggle.sh` | Modified | честное сообщение после `off` + повторная разблокировка |
 | `killswitch.sh`, `singbox-toggle.sh`, `singbox-server.sh` (корень) | Deleted | мёртвые дубли, не попадающие в релиз (у `killswitch` уже разошлась логика) |
-<!-- /ANCHOR:what-built -->
 
 ---
+<!-- /ANCHOR:what-built -->
 
 <!-- ANCHOR:how-delivered -->
 ## How It Was Delivered
 
 Сначала измерения, потом код: бурст снимков окна после двух быстрых тапов, спай всех событий Qt (первая версия спая была собрана GC — переделана с живой ссылкой), замер гэпов 150/500/1000/2000 мс, пиксельная проверка клетки флага, сверка sha256 флагов с источником. Правки — в репо и в живую копию (бэкапы `.pre038`/`.pre039`), GUI перезапущен через `systemd-run --user`, приёмка — сценариями владельца (тап, двойной тап, overscroll, свайпы, внешний `set`). Аудит шёл параллельно тремя read-only ревьюерами; каждую находку перед фиксом проверял сам (например, «расходящиеся дубли» подтвердились только для `killswitch.sh`, а `singbox-toggle.sh`/`singbox-server.sh` в корне оказались байт-в-байт копиями).
-<!-- /ANCHOR:how-delivered -->
 
 ---
+<!-- /ANCHOR:how-delivered -->
 
 <!-- ANCHOR:decisions -->
 ## Key Decisions
@@ -95,9 +95,9 @@ _memory:
 | Флаги | ассет из того же набора + фолбэк «код страны» | Один отсутствующий файл не должен выглядеть как «сломанная» карточка |
 | Дубли скриптов | удалить корневые копии | `install.sh`/`stage.sh` берут `scripts/`; старый `killswitch.sh` в корне уже разошёлся (дыра в DNS-правиле) |
 | Decky-панель | отложить | Правка фронтенда требует сборки бандла и рестарта Steam; жалоба была про десктоп |
-<!-- /ANCHOR:decisions -->
 
 ---
+<!-- /ANCHOR:decisions -->
 
 <!-- ANCHOR:verification -->
 ## Verification
@@ -113,9 +113,9 @@ _memory:
 | Внешний `set N` (панель) | PASS (подсветка переезжает в пределах полла) |
 | Все страницы после чистки мёртвого UI | PASS (снимки `pg_*.png`, GUI живой) |
 | Честный `off`: правила prio 20 после выключения | PASS (0 правил, exit-IP = провайдер, юниты inactive) |
-<!-- /ANCHOR:verification -->
 
 ---
+<!-- /ANCHOR:verification -->
 
 <!-- ANCHOR:limitations -->
 ## Known Limitations
@@ -125,7 +125,6 @@ _memory:
 3. **`_list_apps` в GUI-потоке** (A11): открытие страницы Apps может подвесить UI до 10 с.
 4. **Полное окружение в дочерних процессах** (A12) и **безусловная проба фаервола** (A13) — отложены осознанно: первое требует проверенного минимального env (иначе ломается `systemctl --user`), второе добавляет `sudo` на каждый полл статуса.
 5. **Источник флагов внешний**: новые страны провайдера потребуют положить файл (сейчас покажется код страны — это уже не выглядит поломкой).
-<!-- /ANCHOR:limitations -->
 
 ---
 
@@ -134,6 +133,7 @@ CORE TEMPLATE: Post-implementation documentation, created AFTER work completes.
 -->
 
 ---
+<!-- /ANCHOR:limitations -->
 
 ## Открытый пункт (формальный)
 
