@@ -384,6 +384,34 @@ def load_servers():
     return out
 
 
+SELECTED_JSON = os.path.join(BASE, "singbox", "selected-server.json")
+
+
+def selected_server():
+    """"Selected" server as the backend persists it (singbox-server.sh set N
+    writes it BEFORE switching, and also while the VPN is off) — the same file
+    the Decky panel and status-json read, so all UIs agree on one selection."""
+    try:
+        with open(SELECTED_JSON) as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def selector_now():
+    """Index of the node the selector is actually on (Clash API), None if down."""
+    rc, out, _ = run_cmd("curl -s -m 1 http://127.0.0.1:9090/proxies/proxy", timeout=3)
+    if rc != 0:
+        return None
+    try:
+        now = (json.loads(out) or {}).get("now") or ""
+    except ValueError:
+        return None
+    m = re.match(r"^n(\d+)$", now)
+    return int(m.group(1)) if m else None
+
+
 def save_sub_url(url, path=None):
     """Validate + persist the subscription URL.
 
@@ -694,29 +722,48 @@ class _ElidedLabel(QLabel):
 class _ClickFrame(QFrame):
     """Кликабельный QFrame (карточка-кнопка): QLabel-контент рендерится,
     в отличие от QPushButton с layout (там дочерние QLabel пропадают).
-    Tap-vs-drag: скролл заканчивается тем же release — без slop любой
-    отпуск пальца стрелял бы как тап. Порог 12px по Манхэттену."""
+    Tap-vs-drag в две проверки: локальный слоп 12px по Манхэттену И неизменная
+    позиция скроллбара. Вторая обязательна: при тач-скролле карточка едет вместе
+    с контентом, поэтому локальная дельта почти нулевая (замер: local 18->17 при
+    global 412->247, scroll 0->164) — без неё прокрутка списка выбирала сервер."""
     TAP_SLOP_PX = 12
 
     def __init__(self, on_click, parent=None):
         super().__init__(parent)
         self._cb = on_click
         self._press_pos = None
+        self._press_scroll = None
+
+    def _scroll_value(self):
+        w = self.parentWidget()
+        while w is not None:
+            if isinstance(w, QScrollArea):
+                return w.verticalScrollBar().value()
+            w = w.parentWidget()
+        return None
 
     def mousePressEvent(self, e):
         try:
             self._press_pos = e.position().toPoint()
         except Exception:
             self._press_pos = None
+        self._press_scroll = self._scroll_value()
         super().mousePressEvent(e)
 
     def mouseReleaseEvent(self, e):
-        if e.button() == Qt.MouseButton.LeftButton and self.rect().contains(e.position().toPoint()):
-            pos = e.position().toPoint()
-            start = self._press_pos
-            if start is None or (pos - start).manhattanLength() <= self.TAP_SLOP_PX:
-                self._cb()
+        press = self._press_pos
         self._press_pos = None
+        # отпуск без нажатия на этой карточке = палец стартовал в другом месте
+        if press is None:
+            super().mouseReleaseEvent(e)
+            return
+        # страница проехала под пальцем -> это скролл, а не тап
+        if self._scroll_value() != self._press_scroll:
+            super().mouseReleaseEvent(e)
+            return
+        if e.button() == Qt.MouseButton.LeftButton and self.rect().contains(e.position().toPoint()):
+            if (e.position().toPoint() - press).manhattanLength() <= self.TAP_SLOP_PX:
+                self._cb()
         super().mouseReleaseEvent(e)
 
 
@@ -737,6 +784,23 @@ def _enable_kinetic(scroll_area):
         sp.setScrollerProperties(props)
     except Exception:
         pass
+
+
+class _VScroll(QScrollArea):
+    """Vertical-only scroll area: the content is never allowed to grow wider than
+    the viewport, so the horizontal range stays 0 and the kinetic touch gesture
+    cannot drag the page sideways (dragging stays up/down)."""
+
+    def setWidget(self, w):
+        self._content = w
+        super().setWidget(w)
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        c = getattr(self, "_content", None)
+        if c is not None and c.maximumWidth() != self.viewport().width():
+            c.setMaximumWidth(self.viewport().width())
+
 
 class MainWindow(QMainWindow):
     MODE_LABELS = {"full": "TUNNEL", "smart": "PROXY", "proxy": "PROXY"}
@@ -768,11 +832,13 @@ class MainWindow(QMainWindow):
         self._last_preset = None
         self.connected = False
         self.mode = "smart"          # пользовательский: smart (PROXY) | full (TUNNEL)
+        self.selected_tag = ""       # выбранный сервер (selected-server.json)
+        self.selected_addr = None
+        self.active_idx = None       # нода, на которой реально стоит selector
         self.status = {}
         self.state = "OFF"
         self.desired = "smart"
         self.active_profile = "default"
-        self.active_addr = None
         ensure_rules()
         self._build_ui()
         self._setup_tray()
@@ -865,8 +931,9 @@ class MainWindow(QMainWindow):
         hdr.addStretch()
         outer.addLayout(hdr)
         if scrollable:
-            body = QScrollArea()
+            body = _VScroll()
             body.setWidgetResizable(True)
+            body.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             # touch: drag anywhere to scroll (kinetic, single helper)
             _enable_kinetic(body)
             body.setFrameShape(QFrame.Shape.NoFrame)
@@ -1588,6 +1655,12 @@ class MainWindow(QMainWindow):
         if not isinstance(d, dict):
             return
         self.status = d
+        tag = (d.get("server_tag") or "").strip()
+        if tag != getattr(self, "selected_tag", ""):
+            # status-json carries the same selected-server.json the Decky panel
+            # writes — a switch made there moves the highlight here within a poll
+            self.refresh_active_server()
+            self.render_servers()
         prof = d.get("profile", "default")
         if prof and prof != self.active_profile and prof in self.preset_btns:
             self.active_profile = prof
@@ -1612,6 +1685,10 @@ class MainWindow(QMainWindow):
         if _new != _cur:
             self._log_transition(_cur, _new)
             self._journal_transition(_cur, _new, d)
+            if _new == "CONNECTED":
+                # the selector just came alive: mark which node actually carries us
+                self.active_idx = selector_now()
+                self.render_servers()
         try:
             if _fast_poll_wanted(_new, getattr(self, "_fast_poll_until", 0), time.monotonic()):
                 QTimer.singleShot(500, self.poll_status)
@@ -1780,16 +1857,13 @@ class MainWindow(QMainWindow):
         self.render_servers()
 
     def refresh_active_server(self):
-        self.active_addr = None
-        try:
-            cfg_path = os.path.expanduser("~/AI/singbox/config.json")
-            d = json.load(open(cfg_path))
-            for o in d.get("outbounds") or []:
-                if o.get("tag") == "proxy" and o.get("server"):
-                    self.active_addr = o["server"]
-                    break
-        except (OSError, ValueError):
-            pass
+        # Selected = persisted intent (the same file the panel/status-json use);
+        # live = what the selector is on right now. The old config.json lookup
+        # went blind once 'proxy' became a selector (no 'server' key) — never again.
+        sel = selected_server()
+        self.selected_tag = (sel.get("tag") or "").strip()
+        self.selected_addr = sel.get("server") or None
+        self.active_idx = selector_now()
 
     def render_servers(self):
         # clear grid
@@ -1818,15 +1892,18 @@ class MainWindow(QMainWindow):
             fl.setFixedWidth(26)
             hl.addWidget(fl)
             head = re.sub(r"^\[[A-Za-z0-9]{2,4}\]\s*", "", strip_flags(remark).strip()) or ("Server %d" % (i + 1))
-            active = bool(self.active_addr) and s.get("address") == self.active_addr
-            if active:
+            sel = bool(self.selected_tag) and s.get("remarks") == self.selected_tag
+            if not sel and self.selected_addr:
+                sel = s.get("address") == self.selected_addr
+            live = self.active_idx == i
+            if live:
                 head += "  ●"
             txv = QVBoxLayout()
             txv.setContentsMargins(0, 0, 0, 0)
             txv.setSpacing(0)
             head_lbl = _ElidedLabel(head)
             txv.addWidget(head_lbl)
-            desc_lbl = QLabel(server_desc(s))
+            desc_lbl = _ElidedLabel(server_desc(s))
             desc_lbl.setObjectName("muted")
             txv.addWidget(desc_lbl)
             hl.addLayout(txv, 1)
@@ -1839,7 +1916,9 @@ class MainWindow(QMainWindow):
             r = i // COLS
             c = i % COLS
             self.srv_grid.addWidget(row, r, c)
-            if active:
+            if sel:
+                row.setStyleSheet("QFrame#serverCard { background:#16203A; border:2px solid #3373F7; border-radius:10px; }")
+            elif live:
                 row.setStyleSheet("QFrame#serverCard { background:#14251E; border:1px solid #1A4A2E; border-radius:10px; }")
             else:
                 row.setStyleSheet("QFrame#serverCard { background:#1C1C22; border:1px solid #26262E; border-radius:10px; }")
@@ -1885,6 +1964,11 @@ class MainWindow(QMainWindow):
         if not (0 <= idx < len(self.servers)):
             self.statusBar().showMessage("Bad server", 5000)
             return
+        # Instant feedback: the backend persists this exact choice
+        # (selected-server.json) before switching, so highlight it right away.
+        self.selected_tag = (self.servers[idx].get("remarks") or "").strip()
+        self.selected_addr = self.servers[idx].get("address")
+        self.render_servers()
         self._request_op("server", idx)
 
     def _start_server_worker(self, idx):
@@ -1913,9 +1997,9 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("No servers", 5000)
             return
         idx = 0
-        if self.active_addr:
+        if self.selected_addr:
             for j, _s in enumerate(self.servers):
-                if _s.get("address") == self.active_addr:
+                if _s.get("address") == self.selected_addr:
                     idx = j
                     break
         self._request_op("server", idx)

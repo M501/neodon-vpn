@@ -1,0 +1,19 @@
+{
+ "description": "GUI: подсветка выбранного сервера когда VPN выключен + скролл только вертикальный (тач)",
+ "folderSlug": "gui-podsvetka-vybrannogo-servera-kogda-v",
+ "keywords": [
+  "gui",
+  "podsvetka",
+  "vybrannogo",
+  "servera",
+  "kogda",
+  "v"
+ ],
+ "lastUpdated": "2026-10-05T17:38:04Z",
+ "level": "1",
+ "memoryNameHistory": [],
+ "memorySequence": 0,
+ "parentChain": [],
+ "specFolder": "038-gui-podsvetka-vybrannogo-servera-kogda-v",
+ "specId": "038"
+}
