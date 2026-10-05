@@ -2365,6 +2365,8 @@ def main():
             pass
         open(lock_path, "w").write(str(os.getpid()) + "\n")
     app = QApplication(sys.argv)
+    # KDE/KWin: связать окно с io.neodon.gui.desktop — иконка/имя в таскбаре берутся из desktop-файла
+    app.setDesktopFileName("io.neodon.gui")
     app.setStyle("Fusion")
     app.setStyleSheet(QSS)
     win = MainWindow()

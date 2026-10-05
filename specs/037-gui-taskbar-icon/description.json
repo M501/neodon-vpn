@@ -1,0 +1,16 @@
+{
+ "description": "NeodonVpn GUI: иконка в таскбаре KDE — привязать окно к io.neodon.gui через setDesktopFileName",
+ "folderSlug": "gui-taskbar-icon",
+ "keywords": [
+  "gui",
+  "taskbar",
+  "icon"
+ ],
+ "lastUpdated": "2026-10-05T02:27:16Z",
+ "level": "1",
+ "memoryNameHistory": [],
+ "memorySequence": 0,
+ "parentChain": [],
+ "specFolder": "037-gui-taskbar-icon",
+ "specId": "037"
+}
