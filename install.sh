@@ -130,7 +130,7 @@ fi
 step "installing files"
 dry "mkdir -p ~/AI/singbox ~/AI/singbox/profiles ~/AI/neodon-vpn/icons ~/.local/bin ~/.local/share/applications" \
   || mkdir -p ~/AI/singbox ~/AI/singbox/profiles ~/AI/neodon-vpn/icons ~/.local/bin ~/.local/share/applications
-for f in singbox-toggle.sh singbox-server.sh killswitch.sh dns-fix.sh apply-profile.py neodon-heal.sh neodon-watchdog.sh; do
+for f in singbox-toggle.sh singbox-server.sh killswitch.sh dns-fix.sh apply-profile.py neodon-heal.sh neodon-watchdog.sh neodon-tunnel-guard.sh; do
   [ -f "$BIN/$f" ] || { echo "package broken: $f missing in $BIN" >&2; exit 3; }
   dry "install -Dm755 $f ~/AI/singbox/$f" || install -Dm755 "$BIN/$f" "$HOME/AI/singbox/$f"
 done

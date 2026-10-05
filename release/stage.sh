@@ -10,8 +10,12 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE/bin" "$STAGE/systemd" "$STAGE/desktop" "$STAGE/sudoers.d" \
          "$STAGE/profiles" "$STAGE/icons" "$STAGE/flags" "$STAGE/examples" \
          "$STAGE/decky" "$STAGE/polkit" "$STAGE/hooks"
-# backend scripts + hostctl + GUI
-for f in singbox-toggle.sh singbox-server.sh killswitch.sh dns-fix.sh apply-profile.py neodon-hostctl; do
+# backend scripts + hostctl + GUI. ONE list of truth: every script a shipped systemd
+# unit or the installer invokes must be here (a release without neodon-heal.sh /
+# neodon-watchdog.sh / neodon-tunnel-guard.sh installs units pointing at missing files,
+# and install.sh aborts with "package broken").
+for f in singbox-toggle.sh singbox-server.sh killswitch.sh dns-fix.sh apply-profile.py \
+         neodon-heal.sh neodon-watchdog.sh neodon-tunnel-guard.sh neodon-hostctl; do
   [ -f "$SRC/scripts/$f" ] || { echo "repo broken: scripts/$f missing" >&2; exit 3; }
   cp "$SRC/scripts/$f" "$STAGE/bin/"
 done
@@ -35,6 +39,9 @@ cp -r "$SRC/decky/neodon-vpn" "$STAGE/decky/"
 rm -rf "$STAGE/decky/neodon-vpn/node_modules" "$STAGE/decky/neodon-vpn/dist/*.map"
 # top-level entry points
 cp "$SRC/install.sh" "$SRC/verify.sh" "$STAGE/"
+# stamp the release version into the shipped installer: otherwise it always reports its
+# own hard-coded constant (a fresh 0.1.9 install claimed 0.1.8)
+sed -i "s/^VERSION=.*/VERSION=\"$VER\"/" "$STAGE/install.sh"
 cp "$SRC/README.md" "$STAGE/" 2>/dev/null || echo "# Neodon VPN $VER" > "$STAGE/README.md"
 # secret scan: no UUIDs/keys outside the placeholder
 if grep -rEio '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$STAGE" \
