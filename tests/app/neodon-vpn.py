@@ -1726,15 +1726,14 @@ class MainWindow(QMainWindow):
             self._off_streak = 0
             _new = "CONNECTED"
         elif (_cur == "CONNECTED"
-                and _raw != "LOCKED"
+                and _raw in ("CONNECTING", "STARTING", "DEGRADED", "TRANSITIONING")
                 and _desired_now == getattr(self, "_last_desired", _desired_now)):
-            # wobble guard for EVERY contradicting poll, not only the "in between"
-            # states: a single failed exit-IP probe used to flip the pill to
-            # "Not connected" instantly while the session timer kept counting for
-            # another 24 s — the UI contradicted itself. Three consecutive
-            # contradictions (≈24 s at the 8 s poll) mean it is real. Exceptions:
-            # LOCKED (fail-closed firewall up = honest hard state) and a desired the
-            # user just changed (an explicit OFF must land immediately).
+            # Hysteresis for the soft, self-healing states only (a slow exit-IP probe
+            # used to flap the pill): three consecutive misses (~24 s at the 8 s poll)
+            # mean it is real. Hard states — OFF, FAILED, LOCKED — and a desired the
+            # user just changed stay immediate: when the tunnel is really gone the UI
+            # must say so at once (the timer now clears in the same step, so the pill
+            # and the counter can never contradict each other).
             self._off_streak = getattr(self, "_off_streak", 0) + 1
             _new = "CONNECTED" if self._off_streak < 3 else _raw
         else:
@@ -2026,10 +2025,11 @@ class MainWindow(QMainWindow):
         else:
             lbl.setText("—")
 
-    def _on_ping_result(self, i, ms, gen):
-        # результаты прошлой сетки игнорируем: после reload_servers индекс уже
-        # относится к другому серверу, и задержка встала бы не в ту строку
-        if gen != self._srv_gen:
+    def _on_ping_result(self, i, ms, gen=None):
+        # gen=None keeps direct calls (tests) working; worker results carry their
+        # grid generation, so a ping from the previous server list is dropped
+        # instead of landing on the wrong row after a reload.
+        if gen is not None and gen != self._srv_gen:
             return
         self.lats[i] = ms
         self._paint_lat(i)
