@@ -59,10 +59,11 @@ _memory:
 <!-- ANCHOR:phase-2 -->
 ## Phase 2: Implementation
 
-- [ ] T004 Правка `main()`: `app.setDesktopFileName("io.neodon.gui")` (neodon-vpn.py, корень repo)
-- [ ] T005 [P] Синхронизировать tests/app/neodon-vpn.py
-- [ ] T006 Деплой live SFTP + md5-сверка всех трёх копий
-- [ ] T007 CHANGES.md: запись + git commit (repo)
+- [x] T004 Правка `main()`: `app.setDesktopFileName("io.neodon.gui")` (neodon-vpn.py, корень repo)
+- [x] T005 [P] Синхронизировать tests/app/neodon-vpn.py
+- [x] T006 Деплой live SFTP + md5-сверка всех трёх копий (md5 `3d5938ce…` ×3)
+- [x] T007 CHANGES.md: запись (2026-10-05 (66))
+- [B] T012 git commit CHANGES.md + push в GitHub — ждёт завершения внешнего merge «reconcile M5/device series» (started 05:36; не мой процесс, не вмешивался)
 <!-- /ANCHOR:phase-2 -->
 
 ---
@@ -70,10 +71,10 @@ _memory:
 <!-- ANCHOR:phase-3 -->
 ## Phase 3: Verification
 
-- [ ] T008 Рестарт живого GUI (kill + systemd-run --user, переживает SSH)
-- [ ] T009 KWINDBG-прогон: desktopFileName == io.neodon.gui (REQ-001/SC-001)
-- [ ] T010 Скриншот таскбара: иконка вместо жёлтой W (REQ-002/SC-002)
-- [ ] T011 validate.sh --strict + итоговый md5 (REQ-003/SC-003)
+- [x] T008 Рестарт живого GUI (kill + systemd-run --user, переживает SSH)
+- [x] T009 KWINDBG-прогон: desktopFileName == io.neodon.gui (REQ-001/SC-001)
+- [x] T010 Скриншот таскбара: иконка вместо жёлтой W (REQ-002/SC-002)
+- [x] T011 validate.sh --strict + итоговый md5 (REQ-003/SC-003)
 <!-- /ANCHOR:phase-3 -->
 
 ---

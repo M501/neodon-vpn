@@ -1,3 +1,11 @@
+## 2026-10-05 (66) — иконка в таскбаре Desktop Mode: app_id окна → io.neodon.gui (спека 037)
+
+- Симптом (владелец): в десктопе на портативке кнопка NeodonVpn в таскбаре — «буква W на жёлтом фоне» вместо иконки приложения (иконка на рабочем столе корректная).
+- Корень (доказан живьём): GUI не звал `setDesktopFileName` → Qt Wayland app_id выводился из applicationName («python3»); KWin не находит `python3.desktop` → fallback-иконка темы Breeze `wayland.svg` (жёлтая W). Пруф KWin-скриптом через D-Bus: `KWINDBG|python3|python3.14|python3|Neodon VPN|15775`; fallback-файл `/usr/share/icons/breeze/apps/48/wayland.svg`.
+- Фикс: +1 строка `app.setDesktopFileName("io.neodon.gui")` в `main()` (live + repo + tests/app; md5 всех трёх `3d5938ce2b3d9248f01f90116731aa0d`). Desktop-файлы не трогались (`Icon=io.neodon.gui` уже корректный).
+- Верификация: рестарт GUI (pid 26144, `neodon-gui-live.service`) → `KWINDBG|io.neodon.gui|python3.14|io.neodon.gui|Neodon VPN|26144`; пиксельный пруф: кнопка в таскбаре = синий квадрат с белым контуром-щитом, жёлтая W исчезла (кропы до/после).
+- Бэкап live до правки: `/tmp/neodon-vpn.py.pre037`; откат — revert строки.
+
 ## 2026-10-04 (65) — Refresh из панели: найден и убит корень (env PyInstaller) + панельные UX-фиксы
 
 - Корень «у тебя работает, а у меня нет»: `_fetch_sub_curl` в main.py запускал curl БЕЗ чистки окружения — Decky-бэкенд (PyInstaller) держит LD_LIBRARY_PATH со своими libssl (`/tmp/_MEI.../libssl.so.3`, OPENSSL_3.5.0) → системный curl падал `rc=1`. Когда urllib-попытки ловили антибот DDoS-Guard, curl-fallback валился — клики владельца получали fail, а прямые запуски агента (чистое окружение) проходили. Фикс: `env=_clean_env()`. Пруф: curl-путь отрабатывает даже в «грязном» окружении (userinfo 70 байт, body 89934), refresh ×2 из кода плагина = ok=True за 0.8 с.
