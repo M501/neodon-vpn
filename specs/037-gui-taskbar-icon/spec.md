@@ -13,8 +13,8 @@ _memory:
     packet_pointer: "specs/037-gui-taskbar-icon"
     last_updated_at: "2026-10-05T02:27:16Z"
     last_updated_by: "hermes-main"
-    recent_action: "Spec folder created"
-    next_safe_action: "Fill spec.md"
+    recent_action: "Fix implemented and verified on device (KWINDBG + pixel proof)"
+    next_safe_action: "Commit CHANGES.md + docs after external merge completes"
     blockers: []
     key_files: []
     session_dedup:
@@ -39,7 +39,7 @@ _memory:
 |-------|-------|
 | **Level** | 1 |
 | **Priority** | P2 |
-| **Status** | In Progress |
+| **Status** | Complete |
 | **Created** | 2026-10-05 |
 | **Branch** | `037-gui-taskbar-icon` |
 <!-- /ANCHOR:metadata -->

@@ -1,11 +1,11 @@
 ---
 title: "NeodonVpn GUI: иконка в таскбаре KDE — привяза [spec:037-gui-taskbar-icon]"
-description: "NeodonVpn GUI: иконка в таскбаре KDE — привязать окно к io.neodon.gui через setDesktopFileName"
+description: "Итог: setDesktopFileName(\"io.neodon.gui\") добавлен в main() GUI; app_id окна в KWin изменился python3 → io.neodon.gui; в таскбаре жёлтая W (fallback wayland) заменена на иконку приложения."
 trigger_phrases:
   - "implementation"
   - "summary"
-  - "template"
-  - "impl summary core"
+  - "setDesktopFileName"
+  - "taskbar icon"
 importance_tier: "normal"
 contextType: "general"
 _memory:
@@ -38,9 +38,9 @@ _memory:
 
 | Field | Value |
 |-------|-------|
-| **Spec Folder** | [###-feature-name] |
-| **Completed** | [YYYY-MM-DD] |
-| **Level** | [1/2/3/3+] |
+| **Spec Folder** | 037-gui-taskbar-icon |
+| **Completed** | 2026-10-05 |
+| **Level** | 1 |
 <!-- /ANCHOR:metadata -->
 
 ---
@@ -56,20 +56,19 @@ _memory:
      For Level 1-2, a Files Changed table after the narrative is fine.
      Reference: specs/system-spec-kit/020-mcp-working-memory-hybrid-rag/implementation-summary.md -->
 
-[Opening hook: 2-3 sentences on what changed and why it matters. Lead with impact.]
+Окно Neodon VPN перестало быть «безымянным» для KDE: теперь таскбар, переключатель окон и Alt-Tab берут его иконку из `io.neodon.gui.desktop` — ту же, что на рабочем столе и в меню.
 
-### [Feature Name]
-
-[What this feature does and why it exists. 1-2 paragraphs. Use direct address.
-Explain what the user gains, not what files you touched.]
+Раньше окно несло app_id `python3` (Qt Wayland брал имя интерпретатора, потому что GUI не заявлял desktop-файл), KWin не находил `python3.desktop` и рисовал fallback-иконку темы Breeze `wayland.svg` — «жёлтую W», на которую и пожаловался владелец. Фикс — одна строка в `main()` сразу после создания `QApplication`: окно привязывается к desktop-файлу `io.neodon.gui`.
 
 ### Files Changed
 
-<!-- Include for Level 1-2. Omit for Level 3/3+ where the narrative carries. -->
-
 | File | Action | Purpose |
 |------|--------|---------|
-| [path] | [Created/Modified/Deleted] | [What this change accomplishes] |
+| `/home/m26/AI/neodon-vpn/neodon-vpn.py` (live) | Modified | +2 строки (комментарий + `setDesktopFileName`) |
+| `neodon-vpn.py` (repo) | Modified | Синхронная копия (md5 ×3 идентичен) |
+| `tests/app/neodon-vpn.py` | Modified | Копия для stage.sh — синхронна |
+| `CHANGES.md` | Modified | Запись 2026-10-05 (66) с пруфами |
+| `specs/037-gui-taskbar-icon/` | Created | Спека + план + tasks + summary |
 <!-- /ANCHOR:what-built -->
 
 ---
@@ -83,7 +82,7 @@ Explain what the user gains, not what files you touched.]
      For Level 1: a single sentence is enough.
      For Level 3+: describe stages (testing, rollout, verification). -->
 
-[How was this tested, verified and shipped? What was the rollout approach?]
+Диагноз доказан живьём до правки: KWin-скриптом через D-Bus — app_id `python3`; fallback-файл `/usr/share/icons/breeze/apps/48/wayland.svg` найден на диске; скриншот «до» снят и разобран по пикселям. После правки live-копия обновлена по SFTP (бэкап `/tmp/neodon-vpn.py.pre037`), GUI перезапущен через `systemd-run --user` (пережил закрытие SSH-канала), затем двойная верификация: KWin-скрипт показал `desktopFileName=io.neodon.gui`, а пиксельный разбор свежего скриншота — синий квадрат с белым щитом вместо жёлтой W. md5 всех трёх копий кода совпал.
 <!-- /ANCHOR:how-delivered -->
 
 ---
@@ -96,7 +95,10 @@ Explain what the user gains, not what files you touched.]
 
 | Decision | Why |
 |----------|-----|
-| [What was decided] | [Active-voice rationale with specific reasoning] |
+| `setDesktopFileName` вместо правки `.desktop`-файлов | `.desktop` уже корректный (`Icon=io.neodon.gui`); не матчился сам app_id окна — чинить нужно на стороне приложения |
+| Не трогать `StartupWMClass=neodon-vpn.py` | Остаётся X11-легаси; Wayland-путь работает через app_id, риск регрессии нулевой |
+| Рестарт GUI через `systemd-run --user` | Проверенный путь из скилла: переживает закрытие SSH, не зависит от KDE-автозапуска |
+| Клик по позиции кнопки не делался | Живое состояние читалось через KWin D-Bus и пиксель-разбор — без вмешательства в сессию владельца |
 <!-- /ANCHOR:decisions -->
 
 ---
@@ -109,7 +111,13 @@ Explain what the user gains, not what files you touched.]
 
 | Check | Result |
 |-------|--------|
-| [Validation, lint, tests, manual check] | [PASS/FAIL with specifics] |
+| `python -m py_compile` обеих копий до деплоя | PASS |
+| md5 live == repo == tests/app | PASS (`3d5938ce2b3d9248f01f90116731aa0d` ×3) |
+| KWINDBG до правки | `python3 \| python3.14 \| python3 \| Neodon VPN \| 15775` (fallback) |
+| KWINDBG после правки | `io.neodon.gui \| python3.14 \| io.neodon.gui \| Neodon VPN \| 26144` (PASS) |
+| Пиксельный пруф «до» | жёлтая W (wayland.svg) на кнопке таскбара |
+| Пиксельный пруф «после» | синий скруглённый квадрат с белым контуром-щитом (`#2b6cb0` из `io.neodon.gui.svg`) + индикатор активности |
+| `validate.sh --strict` | PASSED |
 <!-- /ANCHOR:verification -->
 
 ---
@@ -122,7 +130,9 @@ Explain what the user gains, not what files you touched.]
      not "Some features may require configuration."
      Write "None identified." if nothing applies. -->
 
-1. **[Limitation]** [Specific detail with workaround if one exists.]
+1. **X11-сессии не проверялись** — устройство живёт на Wayland; `StartupWMClass` сохранён для совместимости, но X11-путь не тестирован.
+2. **Позиция кнопки в таскбаре сместилась** (следствие пересоздания окна; KDE ставит новые задачи в конец) — нормальное поведение, не дефект.
+3. **CHANGES.md и правки доков — в рабочем дереве**: repo в момент работы оказался в состоянии незавершённого внешнего merge («reconcile M5/device series», started 05:36), коммит отложен до его завершения (tasks T012).
 <!-- /ANCHOR:limitations -->
 
 ---
