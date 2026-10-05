@@ -880,6 +880,8 @@ class MainWindow(QMainWindow):
         self.active_idx = None       # нода, на которой реально стоит selector
         self._sel_intent = None      # выбор пользователя до подтверждения бэкендом
         self._sel_settle_until = 0   # окно, в котором полл не перебивает подсветку
+        self._last_toggle = None     # режим последней операции питания (для повтора)
+        self._toggle_retried = False # один авто-повтор на неудачное подключение
         self.status = {}
         self.state = "OFF"
         self.desired = "smart"
@@ -1471,6 +1473,7 @@ class MainWindow(QMainWindow):
         # занято → очередь last-wins (_request_op), свободно → выполняется сразу.
         # Decide against INTENT (in-flight/queued target), not stale UI state:
         # pressing OFF 1s after ON must queue OFF, not a second ON.
+        self._toggle_retried = False      # a fresh user press gets its own retry budget
         if self._pending:
             heading = self._pending[1][0]
         elif self._op_in_progress:
@@ -1510,6 +1513,7 @@ class MainWindow(QMainWindow):
             return
         self._op_in_progress = True
         self._target = mode
+        self._last_toggle = mode
         self._fast_poll_until = time.monotonic() + 12
         try:
             self.set_state("STOPPING" if mode == "off" else "TRANSITIONING")
@@ -1523,6 +1527,19 @@ class MainWindow(QMainWindow):
     def _toggle_done(self, ok, out):
         self._op_in_progress = False
         self._settle_until = time.monotonic() + 1
+        mode = getattr(self, "_last_toggle", "smart")
+        if not ok and mode != "off" and not getattr(self, "_toggle_retried", False):
+            # A connect can fail on a transient hiccup (DNS for the node hostname times
+            # out for a few seconds while the previous teardown is still settling, a node
+            # blinks). Reporting that as a final error made the owner tap three times in
+            # a row; a real user just presses the button again, so do it once ourselves.
+            self._toggle_retried = True
+            self.statusBar().showMessage(
+                "Connect failed (%s) — retrying once…" % ((out or "?")[-80:]), 8000)
+            QTimer.singleShot(3000, lambda: self.toggle(mode))
+            self.poll_status()
+            self._drain_pending()
+            return
         self.statusBar().showMessage(out or ("Done" if ok else "Error"), 6000)
         self.poll_status()
         self._drain_pending()

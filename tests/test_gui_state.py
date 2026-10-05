@@ -171,6 +171,45 @@ def test_hard_states_apply_at_once_and_clear_the_timer(monkeypatch):
         assert _timer_agrees(win), "%s left the session timer counting" % raw
 
 
+def test_connect_retries_once_before_reporting_an_error(monkeypatch):
+    """One transient failure must not be the final word (the owner tapped three times
+    in a row while a node's DNS was timing out for a few seconds)."""
+    m = _app()
+    win = _reset(_window(monkeypatch))
+
+    scheduled = []
+
+    class _Timer(object):
+        @staticmethod
+        def singleShot(ms, cb):
+            scheduled.append((ms, cb))
+
+    monkeypatch.setattr(m, "QTimer", _Timer)
+    calls = []
+    win.toggle = lambda mode: calls.append(mode)
+
+    win._last_toggle = "smart"
+    win._toggle_retried = False
+    win._toggle_done(False, "VPN: ошибка")
+    assert scheduled and scheduled[0][0] == 3000, "a failed connect must schedule a retry"
+    scheduled[0][1]()                      # the scheduled retry fires
+    assert calls == ["smart"], "the retry must re-issue the connect"
+    assert win.statusBar().currentMessage().startswith("Connect failed"), \
+        "the user is told it is retrying, not shown a dead end"
+
+    # the second failure is reported and NOT retried again
+    before = len(scheduled)
+    win._toggle_done(False, "VPN: ошибка")
+    assert len(scheduled) == before, "only one automatic retry per user press"
+
+    # an explicit OFF is never retried
+    win._last_toggle = "off"
+    win._toggle_retried = False
+    before = len(scheduled)
+    win._toggle_done(False, "VPN: ошибка")
+    assert len(scheduled) == before, "a failed disconnect must not be retried silently"
+
+
 # --- standalone runner (no pytest) -------------------------------------------
 class _MP(object):
     """Minimal monkeypatch stand-in for the standalone run."""
@@ -181,7 +220,8 @@ class _MP(object):
 
 if __name__ == "__main__":
     checks = [test_soft_states_are_debounced_and_the_timer_follows,
-              test_hard_states_apply_at_once_and_clear_the_timer]
+              test_hard_states_apply_at_once_and_clear_the_timer,
+              test_connect_retries_once_before_reporting_an_error]
     bad = 0
     print("GUI under test:", APP)
     for fn in checks:
