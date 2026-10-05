@@ -40,7 +40,7 @@ _memory:
 |-------|-------|
 | **Level** | 2 |
 | **Priority** | P1 |
-| **Status** | In Progress |
+| **Status** | Review (ждёт приёмки владельца) |
 | **Created** | 2026-10-04 |
 | **Branch** | `035-panel-switch-ux` |
 <!-- /ANCHOR:metadata -->
