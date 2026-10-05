@@ -1,0 +1,18 @@
+{
+ "description": "GUI: быстрые переключения серверов без прыжков подсветки, немецкий флаг, аудит и доводка до продакшена",
+ "folderSlug": "gui-bystrye-pereklyucheniya-serverov-bez",
+ "keywords": [
+  "gui",
+  "bystrye",
+  "pereklyucheniya",
+  "serverov",
+  "bez"
+ ],
+ "lastUpdated": "2026-10-05T18:21:24Z",
+ "level": "2",
+ "memoryNameHistory": [],
+ "memorySequence": 0,
+ "parentChain": [],
+ "specFolder": "039-gui-bystrye-pereklyucheniya-serverov-bez",
+ "specId": "039"
+}

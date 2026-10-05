@@ -104,10 +104,20 @@ case "$1" in
       bash ~/AI/singbox/killswitch.sh remove >/dev/null 2>&1 || true
       echo "unlocked killswitch leftovers"
     fi
+    # the unlock above is best-effort: never claim "internet via ISP" while the
+    # fail-closed REJECT is still in place (that lie costs the owner an evening)
+    if sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null | grep -q 'filter OUTPUT_direct 20 '; then
+      bash ~/AI/singbox/killswitch.sh remove >/dev/null 2>&1 || true
+    fi
     bash ~/AI/singbox/dns-fix.sh restore || true
     set_mode off
-    echo "VPN OFF — internet via ISP"
-    notify "VPN OFF — internet via ISP"
+    if sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null | grep -q 'filter OUTPUT_direct 20 '; then
+      echo "VPN OFF — WARNING: firewall still LOCKED (REJECT rules left)"
+      notify "VPN OFF — firewall still LOCKED"
+    else
+      echo "VPN OFF — internet via ISP"
+      notify "VPN OFF — internet via ISP"
+    fi
     ;;
 status-json)
     desired=$(cat "$MODE_FILE" 2>/dev/null || echo unknown)

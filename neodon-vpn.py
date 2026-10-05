@@ -17,18 +17,11 @@ import time
 
 from PySide6.QtCore import Qt, QThread, QTimer, QSize, Signal, QEasingCurve
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QPushButton,
-                               QSystemTrayIcon, QMenu,
-                               QVBoxLayout, QHBoxLayout, QStackedWidget, QFrame,
-                               QListWidget, QListWidgetItem, QMessageBox,
-                               QComboBox, QProgressBar, QRadioButton, QButtonGroup,
+                               QSystemTrayIcon, QMenu, QDialog, QFrame, QGridLayout,
+                               QVBoxLayout, QHBoxLayout, QStackedWidget, QPlainTextEdit,
+                               QProgressBar, QButtonGroup,
                                QCheckBox, QLineEdit, QScrollArea, QSizePolicy)
-from PySide6.QtGui import QIcon, QColor, QPixmap
-from PySide6.QtWidgets import (
-    QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog, QFrame, QGridLayout,
-    QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
-    QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QStackedWidget,
-    QVBoxLayout, QWidget,
-)
+from PySide6.QtGui import QIcon, QPixmap
 
 HOME = os.path.expanduser("~")
 BASE = os.path.join(HOME, "AI")
@@ -44,7 +37,8 @@ STATE_DIR = os.path.expanduser("~/.var/app/io.neodon.gui") if SANDBOX else APP_D
 ACTION_HOOK = os.path.join(STATE_DIR, "gui-action.json")
 SERVICES = ("sing-box.service", "sing-box-full.service", "sing-box-proxy.service")
 GB = 1073741824
-ENV = dict(os.environ, XDG_RUNTIME_DIR="/run/user/1000")
+ENV = dict(os.environ,
+           XDG_RUNTIME_DIR=os.environ.get("XDG_RUNTIME_DIR") or "/run/user/%d" % os.getuid())
 
 FLATPAK_MAP = {
     "org.mozilla.firefox": "firefox",
@@ -421,6 +415,10 @@ def save_sub_url(url, path=None):
     url = (url or "").strip()
     if not re.match(r"^https?://\S+$", url):
         return "URL must start with http(s)://"
+    # the link is pasted into the converter's Python source as a single-quoted
+    # literal: a quote/backslash/newline would corrupt that file (or inject code)
+    if any(ch in url for ch in "'\"\\\n\r"):
+        return "URL must not contain quotes, backslashes or line breaks"
     p = path or CONVERTER
     try:
         src = open(p, encoding="utf-8", errors="replace").read()
@@ -615,21 +613,22 @@ class SelectWorker(QThread):
 
 
 class PingWorker(QThread):
-    result = Signal(int, int)
+    result = Signal(int, int, int)
     done = Signal()
 
-    def __init__(self, servers):
+    def __init__(self, servers, gen):
         super().__init__()
         self.servers = servers
+        self.gen = gen
 
     def run(self):
         for i, s in enumerate(self.servers):
             t0 = time.monotonic()
             try:
                 with socket.create_connection((s["address"], s["port"]), timeout=2):
-                    self.result.emit(i, round((time.monotonic() - t0) * 1000))
+                    self.result.emit(i, round((time.monotonic() - t0) * 1000), self.gen)
             except Exception:
-                self.result.emit(i, -1)
+                self.result.emit(i, -1, self.gen)
         self.done.emit()
 
 
@@ -727,6 +726,7 @@ class _ClickFrame(QFrame):
     с контентом, поэтому локальная дельта почти нулевая (замер: local 18->17 при
     global 412->247, scroll 0->164) — без неё прокрутка списка выбирала сервер."""
     TAP_SLOP_PX = 12
+    DOUBLE_TAP_S = 0.6   # окно, в котором Qt отдаёт второй быстрый тап как DblClick
 
     def __init__(self, on_click, parent=None):
         super().__init__(parent)
@@ -742,27 +742,53 @@ class _ClickFrame(QFrame):
             w = w.parentWidget()
         return None
 
-    def mousePressEvent(self, e):
+    def _note_press(self, e):
         try:
             self._press_pos = e.position().toPoint()
         except Exception:
             self._press_pos = None
         self._press_scroll = self._scroll_value()
+        _LAST_TAP["press"] = time.monotonic()
+        _LAST_TAP["scroll"] = self._press_scroll
+
+    def mousePressEvent(self, e):
+        self._note_press(e)
         super().mousePressEvent(e)
 
+    def mouseDoubleClickEvent(self, e):
+        # Быстрый второй тап Qt отдаёт как DblClick, а Press не приходит вовсе
+        # (замер: release с press=None через 250 мс после первого тапа) — без этой
+        # ветки второй выбор терялся, а раньше (без гварда) он срабатывал как
+        # «отпуск без нажатия», из-за чего и появлялись ложные переключения.
+        self._note_press(e)
+        super().mouseDoubleClickEvent(e)
+
     def mouseReleaseEvent(self, e):
+        now = time.monotonic()
+        prev_release = _LAST_TAP["release"]
+        _LAST_TAP["release"] = now
         press = self._press_pos
+        press_scroll = self._press_scroll
         self._press_pos = None
-        # отпуск без нажатия на этой карточке = палец стартовал в другом месте
+        pos = e.position().toPoint()
         if press is None:
-            super().mouseReleaseEvent(e)
-            return
+            # Отпуск без нажатия на этой карточке. Для тачскрина это либо жест, либо
+            # второй быстрый тап: Qt доставляет нажатие второго тапа в QWindow (замер:
+            # MouseButtonPress и DblClick -> QWindow, карточке приходит только release).
+            # Тапом признаём ТОЛЬКО отпуск, идущий вплотную за предыдущим тапом при
+            # неподвижной странице — иначе это скролл или палец, начавшийся в другом месте.
+            fresh = 0 < (now - prev_release) <= self.DOUBLE_TAP_S
+            if not (fresh and self._scroll_value() == _LAST_TAP["scroll"]):
+                super().mouseReleaseEvent(e)
+                return
+            press = pos
+            press_scroll = self._scroll_value()
         # страница проехала под пальцем -> это скролл, а не тап
-        if self._scroll_value() != self._press_scroll:
+        if self._scroll_value() != press_scroll:
             super().mouseReleaseEvent(e)
             return
-        if e.button() == Qt.MouseButton.LeftButton and self.rect().contains(e.position().toPoint()):
-            if (e.position().toPoint() - press).manhattanLength() <= self.TAP_SLOP_PX:
+        if e.button() == Qt.MouseButton.LeftButton and self.rect().contains(pos):
+            if (pos - press).manhattanLength() <= self.TAP_SLOP_PX:
                 self._cb()
         super().mouseReleaseEvent(e)
 
@@ -802,6 +828,14 @@ class _VScroll(QScrollArea):
             c.setMaximumWidth(self.viewport().width())
 
 
+_CARD_QSS = "QFrame#serverCard { background:#1C1C22; border:1px solid #26262E; border-radius:10px; }"
+_CARD_LIVE_QSS = "QFrame#serverCard { background:#14251E; border:1px solid #1A4A2E; border-radius:10px; }"
+_CARD_SEL_QSS = "QFrame#serverCard { background:#16203A; border:2px solid #3373F7; border-radius:10px; }"
+# Последний тап по любой карточке (времена + позиция скроллбара). Нужен только для
+# второго быстрого тапа, нажатие которого Qt уводит в QWindow: см. mouseReleaseEvent.
+_LAST_TAP = {"press": 0.0, "release": 0.0, "scroll": None}
+
+
 class MainWindow(QMainWindow):
     MODE_LABELS = {"full": "TUNNEL", "smart": "PROXY", "proxy": "PROXY"}
 
@@ -821,6 +855,8 @@ class MainWindow(QMainWindow):
         self._fit_once()
         self.servers = []
         self.lats = {}
+        self._srv_gen = 0            # поколение списка серверов (для пингов)
+        self._ping_busy = False
         self._workers = []
         self._op_in_progress = False
         self._poll_busy = False
@@ -835,6 +871,8 @@ class MainWindow(QMainWindow):
         self.selected_tag = ""       # выбранный сервер (selected-server.json)
         self.selected_addr = None
         self.active_idx = None       # нода, на которой реально стоит selector
+        self._sel_intent = None      # выбор пользователя до подтверждения бэкендом
+        self._sel_settle_until = 0   # окно, в котором полл не перебивает подсветку
         self.status = {}
         self.state = "OFF"
         self.desired = "smart"
@@ -842,7 +880,8 @@ class MainWindow(QMainWindow):
         ensure_rules()
         self._build_ui()
         self._setup_tray()
-        self.set_mode(current_mode() if current_mode() in ("smart", "full") else "smart")
+        _m = current_mode()
+        self.set_mode(_m if _m in ("smart", "full") else "smart")
         self.refresh_active_server()
         self.reload_servers()
         self.timer_q = QTimer(self)
@@ -1311,13 +1350,6 @@ class MainWindow(QMainWindow):
         auto.setObjectName("muted")
         auto.setWordWrap(True)
         gl.addWidget(auto)
-        dns_row = QHBoxLayout()
-        dns_l = QLabel("DNS")
-        dns_l.setObjectName("muted")
-        self.dns_edit = QLineEdit("1.1.1.1")
-        dns_row.addWidget(dns_l)
-        dns_row.addWidget(self.dns_edit, 1)
-        gl.addLayout(dns_row)
 
         g2, g2l = self._card(bl, "APP ROUTING")
         desc = QLabel("Apps that go direct (bypass VPN) in PROXY mode.")
@@ -1380,10 +1412,6 @@ class MainWindow(QMainWindow):
         self.apps_rows.setContentsMargins(4, 4, 4, 4)
         self.apps_scroll.setWidget(self.apps_cont)
         bl.addWidget(self.apps_scroll, 1)
-        self.apps_done = QPushButton("Apply")
-        self.apps_done.setObjectName("accent")
-        bl.addWidget(self.apps_done)
-        self._apps_loaded = False
         self.apps_page = _AppsPage(self)
 
     # ---- About ----
@@ -1656,11 +1684,13 @@ class MainWindow(QMainWindow):
             return
         self.status = d
         tag = (d.get("server_tag") or "").strip()
-        if tag != getattr(self, "selected_tag", ""):
-            # status-json carries the same selected-server.json the Decky panel
-            # writes — a switch made there moves the highlight here within a poll
-            self.refresh_active_server()
-            self.render_servers()
+        if (tag != getattr(self, "selected_tag", "") and self._sel_intent is None
+                and not self._pending and time.monotonic() >= self._sel_settle_until):
+            # a switch made elsewhere (Decky panel) — adopt it only when nothing of
+            # ours is in flight and the post-op settle window has closed, so a stale
+            # poll can never repaint the card the user just left
+            if self.refresh_active_server():
+                self._paint_selection()
         prof = d.get("profile", "default")
         if prof and prof != self.active_profile and prof in self.preset_btns:
             self.active_profile = prof
@@ -1688,14 +1718,16 @@ class MainWindow(QMainWindow):
             if _new == "CONNECTED":
                 # the selector just came alive: mark which node actually carries us
                 self.active_idx = selector_now()
-                self.render_servers()
+                self._paint_selection()
         try:
             if _fast_poll_wanted(_new, getattr(self, "_fast_poll_until", 0), time.monotonic()):
                 QTimer.singleShot(500, self.poll_status)
         except RuntimeError:
             pass
         self.state = _new
-        self.connected = d.get("actual_state") == "CONNECTED"
+        # debounced state, not the raw field: during a single status blip the pill
+        # keeps CONNECTED, and a power tap then means "turn off", not "on" again
+        self.connected = self.state == "CONNECTED"
         if self.state == "CONNECTED":
             if getattr(self, "_epoch", None) is None:
                 self._epoch = seed_epoch()
@@ -1854,20 +1886,38 @@ class MainWindow(QMainWindow):
     def reload_servers(self):
         self.servers = load_servers()
         self.lats = {}
+        self._srv_gen += 1           # in-flight пинги прошлой сетки станут невалидны
         self.render_servers()
 
     def refresh_active_server(self):
         # Selected = persisted intent (the same file the panel/status-json use);
         # live = what the selector is on right now. The old config.json lookup
         # went blind once 'proxy' became a selector (no 'server' key) — never again.
+        # Returns True when the selection actually changed (caller decides to repaint).
         sel = selected_server()
-        self.selected_tag = (sel.get("tag") or "").strip()
-        self.selected_addr = sel.get("server") or None
-        self.active_idx = selector_now()
+        tag = (sel.get("tag") or "").strip()
+        addr = sel.get("server") or None
+        idx = selector_now()
+        changed = (tag != self.selected_tag) or (addr != self.selected_addr) or (idx != self.active_idx)
+        self.selected_tag = tag
+        self.selected_addr = addr
+        self.active_idx = idx
+        return changed
+
+    def _highlight_selected(self, tag, addr):
+        """Paint a selection the user just made; never adopted from a stale poll."""
+        tag = (tag or "").strip()
+        addr = addr or None
+        if tag == self.selected_tag and addr == self.selected_addr:
+            return
+        self.selected_tag = tag
+        self.selected_addr = addr
+        self._paint_selection()
 
     def render_servers(self):
         # clear grid
         self._srv_lat = {}
+        self._srv_cards = []      # (row, head label, base head text) — repaint in place
         while self.srv_grid.count():
             child = self.srv_grid.takeAt(0)
             if child.widget():
@@ -1887,17 +1937,12 @@ class MainWindow(QMainWindow):
             if pix is not None:
                 fl.setPixmap(pix)
             else:
-                fl.setText("●")
-                fl.setStyleSheet("color:#33333D; font-size:14px;")
+                # no flag asset for this code (the provider adds countries) — show the code
+                fl.setText(code or "●")
+                fl.setStyleSheet("color:#6E6E78; font-size:10px; font-weight:700;")
             fl.setFixedWidth(26)
             hl.addWidget(fl)
             head = re.sub(r"^\[[A-Za-z0-9]{2,4}\]\s*", "", strip_flags(remark).strip()) or ("Server %d" % (i + 1))
-            sel = bool(self.selected_tag) and s.get("remarks") == self.selected_tag
-            if not sel and self.selected_addr:
-                sel = s.get("address") == self.selected_addr
-            live = self.active_idx == i
-            if live:
-                head += "  ●"
             txv = QVBoxLayout()
             txv.setContentsMargins(0, 0, 0, 0)
             txv.setSpacing(0)
@@ -1916,12 +1961,26 @@ class MainWindow(QMainWindow):
             r = i // COLS
             c = i % COLS
             self.srv_grid.addWidget(row, r, c)
-            if sel:
-                row.setStyleSheet("QFrame#serverCard { background:#16203A; border:2px solid #3373F7; border-radius:10px; }")
-            elif live:
-                row.setStyleSheet("QFrame#serverCard { background:#14251E; border:1px solid #1A4A2E; border-radius:10px; }")
-            else:
-                row.setStyleSheet("QFrame#serverCard { background:#1C1C22; border:1px solid #26262E; border-radius:10px; }")
+            self._srv_cards.append((row, head_lbl, head))
+        self._paint_selection()
+
+    def _paint_selection(self):
+        """Repaint selection/live IN PLACE; never rebuild the grid here.
+
+        A rebuild (deleteLater + fresh widgets) destroys the card under a finger, and
+        the following release lands on a press-less widget — the tap is swallowed and
+        fast switching looks like the highlight jumping between cards."""
+        for i, (row, head_lbl, base) in enumerate(getattr(self, "_srv_cards", [])):
+            if i >= len(self.servers):
+                break
+            s = self.servers[i]
+            sel = bool(self.selected_tag) and s.get("remarks") == self.selected_tag
+            if not sel and self.selected_addr:
+                sel = s.get("address") == self.selected_addr
+            live = self.active_idx == i
+            head_lbl.setText(base + ("  ●" if live else ""))
+            row.setStyleSheet(_CARD_SEL_QSS if sel else (_CARD_LIVE_QSS if live else _CARD_QSS))
+            row.update()
 
     def _paint_lat(self, i):
         lbl = getattr(self, "_srv_lat", {}).get(i)
@@ -1936,15 +1995,20 @@ class MainWindow(QMainWindow):
         else:
             lbl.setText("—")
 
-    def _on_ping_result(self, i, ms):
+    def _on_ping_result(self, i, ms, gen):
+        # результаты прошлой сетки игнорируем: после reload_servers индекс уже
+        # относится к другому серверу, и задержка встала бы не в ту строку
+        if gen != self._srv_gen:
+            return
         self.lats[i] = ms
         self._paint_lat(i)
 
     def start_ping(self):
-        if not self.servers:
+        if not self.servers or self._ping_busy:
             return
+        self._ping_busy = True
         self._ping_glow(True)
-        w = PingWorker(self.servers)
+        w = PingWorker(self.servers, self._srv_gen)
         w.result.connect(self._on_ping_result)
         w.done.connect(self._ping_done)
         w.start()
@@ -1958,17 +2022,19 @@ class MainWindow(QMainWindow):
             pass
 
     def _ping_done(self):
+        self._ping_busy = False
         self._ping_glow(False)  # latencies already painted in place
 
     def _select_server_idx(self, idx):
         if not (0 <= idx < len(self.servers)):
             self.statusBar().showMessage("Bad server", 5000)
             return
-        # Instant feedback: the backend persists this exact choice
-        # (selected-server.json) before switching, so highlight it right away.
-        self.selected_tag = (self.servers[idx].get("remarks") or "").strip()
-        self.selected_addr = self.servers[idx].get("address")
-        self.render_servers()
+        s = self.servers[idx]
+        # Intent + instant feedback: the backend persists exactly this choice
+        # (selected-server.json) before switching, so paint it now and keep it until
+        # the file confirms — otherwise a stale poll repaints the card the user left.
+        self._sel_intent = (s.get("remarks") or "").strip()
+        self._highlight_selected(self._sel_intent, s.get("address"))
         self._request_op("server", idx)
 
     def _start_server_worker(self, idx):
@@ -1987,39 +2053,23 @@ class MainWindow(QMainWindow):
         w.start()
         self._workers.append(w)
 
-    def select_server(self):
-        # legacy QListWidget removed — grid uses direct _select_server_idx on card click
-        # keep btn compat: pick active or 0
-        if self._op_in_progress:
-            self.statusBar().showMessage("Op already running — wait…", 4000)
-            return
-        if not self.servers:
-            self.statusBar().showMessage("No servers", 5000)
-            return
-        idx = 0
-        if self.selected_addr:
-            for j, _s in enumerate(self.servers):
-                if _s.get("address") == self.selected_addr:
-                    idx = j
-                    break
-        self._request_op("server", idx)
-
     def _select_done(self, ok, out):
         self._op_in_progress = False
         self._settle_until = time.monotonic() + 1
+        self._sel_settle_until = time.monotonic() + 2
         if ok:
             self.statusBar().showMessage("Server switched", 4000)
-            self.refresh_active_server()
-            self.render_servers()
         else:
             self.statusBar().showMessage("Error: %s" % (out or "?"), 8000)
             self.pill.set_state(self.state or "OFF")
+        if self._pending:
+            pass  # newer tap queued: its highlight must survive this completion
+        else:
+            self._sel_intent = None
+            if self.refresh_active_server():
+                self._paint_selection()
         self.poll_status()
         self._drain_pending()
-
-    def status_meta_ip(self, ip):
-        # exit ip уже приходит в status-json; здесь дублируем для информации
-        pass
 
     # ---- подписка ----
     def save_sub(self):
@@ -2031,15 +2081,22 @@ class MainWindow(QMainWindow):
         url, _, raw = converter_consts()
         if not url:
             return None, url
-        script = ("curl -sL -A 'v2rayN/7.24.6' -c /tmp/neodon_cj.txt -o /dev/null -m 15 '%s' >/dev/null 2>&1 || true\n"
-                  "curl -sL -A 'v2rayN/7.24.6' -b /tmp/neodon_cj.txt -D /tmp/neodon_hdr.txt -o /dev/null -m 15 '%s' >/dev/null 2>&1 || true\n"
-                  "grep -i '^subscription-userinfo:' /tmp/neodon_hdr.txt | tr -d '\\r' || true\n" % (url, url))
+        # per-process temp names: the Decky refresh runs the same curls, and fixed
+        # /tmp paths let one process move the other's half-written body onto raw.json
+        pid = os.getpid()
+        cj = "/tmp/neodon_cj.%d.txt" % pid
+        hdr = "/tmp/neodon_hdr.%d.txt" % pid
+        body = "/tmp/neodon_body.%d.json" % pid
+        script = ("curl -sL -A 'v2rayN/7.24.6' -c %s -o /dev/null -m 15 '%s' >/dev/null 2>&1 || true\n"
+                  "curl -sL -A 'v2rayN/7.24.6' -b %s -D %s -o /dev/null -m 15 '%s' >/dev/null 2>&1 || true\n"
+                  "grep -i '^subscription-userinfo:' %s | tr -d '\\r' || true\n"
+                  % (cj, url, cj, hdr, url, hdr))
         if fetch_body:
             script += (
-                "curl -sL -A 'v2rayN/7.24.6' -b /tmp/neodon_cj.txt -m 15 '%s' -o /tmp/neodon_body.json || exit 2\n"
-                "python3 -c \"import json;d=json.load(open('/tmp/neodon_body.json'));"
+                "curl -sL -A 'v2rayN/7.24.6' -b %s -m 15 '%s' -o %s || exit 2\n"
+                "python3 -c \"import json;d=json.load(open('%s'));"
                 "assert isinstance(d,list) and d and 'outbounds' in d[0]\" || exit 3\n"
-                "mv /tmp/neodon_body.json '%s' || exit 4\n" % (url, raw))
+                "mv %s '%s' || exit 4\n" % (cj, url, body, body, body, raw))
         script += "echo DONE\n"
         return script, url
 
@@ -2054,10 +2111,14 @@ class MainWindow(QMainWindow):
         self._workers.append(w)
 
     def refresh_sub(self):
+        if getattr(self, "_sub_busy", False):
+            self.statusBar().showMessage("Refresh already running…", 4000)
+            return
         script, url = self._sub_script(fetch_body=True)
         if not script:
             self.statusBar().showMessage("Subscription URL missing", 6000)
             return
+        self._sub_busy = True
         self.statusBar().showMessage("Refreshing subscription…")
         for b in getattr(self, "_refresh_btns", []):
             try:
@@ -2154,6 +2215,7 @@ class MainWindow(QMainWindow):
         self._spin_stop()
 
     def _sub_failed(self, err):
+        self._sub_busy = False
         self._refresh_restore()
         self.statusBar().showMessage(
             "Subscription error: " + (err[-120:] if err else "?"), 8000)
@@ -2207,6 +2269,7 @@ class MainWindow(QMainWindow):
         self._apply_sub_info(out)
 
     def _sub_loaded_full(self, out):
+        self._sub_busy = False
         self._refresh_restore()
         self._apply_sub_info(out)
         self.sub_updated.setText("Updated: " + time.strftime("%d.%m %H:%M"))
