@@ -17,16 +17,26 @@ fi
 case_G1() {
   require_firewall || return 77
   bash "$BACKEND_ROOT/singbox-toggle.sh" full >/dev/null
-  firewall-cmd --direct --get-all-rules | grep -q 'OUTPUT_direct'
+  # firewall-cmd must run privileged: as a plain user it goes through polkit and dies
+  # with "Authorization failed. Make sure polkit agent is running" (no agent over SSH),
+  # which used to read as FAIL for a case that only inspects the daemon
+  local rules
+  rules="$(fw_rules)" || return 1
+  grep -q 'OUTPUT_direct' <<<"$rules"
 }
 case_G2() {
   require_firewall || return 77
   bash "$BACKEND_ROOT/singbox-server.sh" set "$WORKING_SERVER" >/dev/null
-  grep -q "${WORKING_SERVER}" < <(firewall-cmd --direct --get-all-rules) || return 77
+  local rules
+  rules="$(fw_rules)" || return 1
+  grep -q "${WORKING_SERVER}" <<<"$rules" || return 77
 }
 case_G3() {
   bash "$BACKEND_ROOT/singbox-toggle.sh" off >/dev/null
-  ! firewall-cmd --direct --get-all-rules | grep -q 'OUTPUT_direct.*20'
+  # a failed query must not read as "the firewall is clean" (that inverted the result)
+  local rules
+  rules="$(fw_rules)" || return 1
+  ! grep -q 'OUTPUT_direct.*20' <<<"$rules"
 }
 case_G4() {
   require_firewall || return 77
@@ -48,11 +58,26 @@ case_H3() { bash "$BACKEND_ROOT/singbox-server.sh" set 4 >/dev/null; }
 case_H4() {
   require_disruptive || return 77
   bash "$BACKEND_ROOT/singbox-toggle.sh" full >/dev/null
-  local pid="$(systemctl --user show -p MainPID --value sing-box-full.service)"
-  [[ "$pid" =~ ^[0-9]+$ && "$pid" -gt 1 ]]
+  local pid; pid="$(systemctl --user show -p MainPID --value sing-box-full.service)"
+  [[ "$pid" =~ ^[0-9]+$ && "$pid" -gt 1 ]] || return 1
   kill -9 "$pid"
-  sleep 2
-  bash "$BACKEND_ROOT/singbox-toggle.sh" status-json | python3 -c 'import json,sys; o=json.load(sys.stdin); assert o["actual_state"] in {"LOCKED","DEGRADED","FAILED","TRANSITIONING"}'
+  # The core is a systemd unit with Restart=on-failure: killing it must either be
+  # survived (the service comes back, tunnel CONNECTED) or be reported honestly as
+  # LOCKED/DEGRADED/FAILED. Waiting for a "bad" state only was wrong (it self-heals)
+  # and unbounded (the probes inside status-json time out while the tunnel is down,
+  # which is how this case burned 27 minutes). Poll with a bounded budget instead.
+  local t0; t0="$(date +%s)"
+  while (( $(date +%s) - t0 < 90 )); do
+    local state
+    state="$(timeout 30 bash "$BACKEND_ROOT/singbox-toggle.sh" status-json 2>/dev/null \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin).get("actual_state",""))' 2>/dev/null)"
+    echo "INFO|H4_state=$state"
+    case "$state" in
+      CONNECTED|LOCKED|DEGRADED|FAILED|TRANSITIONING) return 0 ;;
+    esac
+    sleep 5
+  done
+  return 1
 }
 case_H5() { return 77; } # disk-full simulation is risky on prod
 case_H6() { return 77; } # sudoers mutation is risky on prod

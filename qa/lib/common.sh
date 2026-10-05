@@ -56,6 +56,22 @@ require_firewall() {
     [ "${NEODON_ALLOW_FIREWALL:-0}" = 1 ] || return 1
 }
 
+fw_rules() {
+    # sudo -n firewall-cmd --direct --get-all-rules, with retries: as a plain user the
+    # call goes through polkit ("Authorization failed") and firewalld can hiccup right
+    # after a rule reload. A failed query must still end up as a failure (never as
+    # "no rules"), but a transient hiccup is not a verdict.
+    local i out
+    for i in 1 2 3; do
+        if out="$(sudo -n firewall-cmd --direct --get-all-rules 2>/dev/null)"; then
+            printf '%s\n' "$out"
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
 require_ui_input() {
     [ "${NEODON_ALLOW_UI_INPUT:-0}" = 1 ] || return 1
 }
